@@ -1,0 +1,17 @@
+{
+  "spotify": {
+    "client_secret": "[your spotify client secret]",
+    "client_id": "[your spotify client ID]",
+    "redirect_uri": "http://localhost:8080/callback",
+    "scope": "user-top-read user-library-read"
+  },
+  "lastfm": {
+    "api_key": "[your last.fm API key]",
+    "secret": "[your last.fm secret]",
+    "user": "[Last.fm username]"
+  },
+  "database": {
+    "name": "MusicLibrary.db"
+  }
+}
+
