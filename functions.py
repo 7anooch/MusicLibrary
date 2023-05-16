@@ -1435,7 +1435,7 @@ def update_rym_genres(conn, use_scraperapi=False):
         if (artist_name, album_name) in skipped_albums:
             continue
 
-        if x % 3 == 0:
+        if x % 3 == 0 and use_scraperapi==False:
             time.sleep(30)
         x += 1
 
@@ -2071,7 +2071,14 @@ def set_last_executed_date(conn, date):
 def should_execute_function(conn):
     last_executed_date = get_last_executed_date(conn)
     current_date = datetime.datetime.now().date()
-    return current_date != last_executed_date.date()
+    
+    # Check if last_executed_date is not None
+    if last_executed_date:
+        return current_date != last_executed_date.date()
+    else:
+        # Return True or whatever is appropriate when last_executed_date is None
+        return True
+
 
 # Inserts an initial last executed date into the database
 def insert_initial_last_executed_date(conn):
