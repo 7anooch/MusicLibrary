@@ -4,6 +4,8 @@ needs https://github.com/dbeley/rymscraper
 
 you will also need lastfm and spotify API keys, add them to the keys.json (and get rid of the '\_template' part)
 
-run musiclib.py to set up the database and update it, run main.py for GUI
+`pip install -r requirements.txt ` for dependencies
+
+run musiclib.py to set up the database and update it, run main.py for GUI (for now..)
 
 Setting up the whole thing takes quite a while if you have a lot of scrobbles/saved albums.
