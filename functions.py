@@ -1273,6 +1273,9 @@ def update_spotify_data(conn, spotify_token):
             time.sleep(2)
         try:
             artist_response = requests.get(artist_search_url, headers=headers)
+            if artist_response.status_code != 200:
+                print(f"Error fetching Spotify URL for artist {artist_name}: Status {artist_response.status_code}, {artist_response.text}")
+                continue
             artist_data = artist_response.json()
 
             if 'artists' in artist_data and artist_data['artists']['items']:
@@ -1291,6 +1294,9 @@ def update_spotify_data(conn, spotify_token):
             time.sleep(2)
         try:
             album_response = requests.get(album_search_url, headers=headers)
+            if album_response.status_code != 200:
+                print(f"Error fetching Spotify URL for album {album_name}: Status {album_response.status_code}, {album_response.text}")
+                continue
             album_data = album_response.json()
 
             if 'albums' in album_data and album_data['albums']['items']:
@@ -1307,6 +1313,18 @@ def update_spotify_data(conn, spotify_token):
         x += 1 
     conn.commit()
     print("Updated artist and album URLs.")
+
+def is_spotify_token_valid(access_token):
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+    response = requests.get('https://api.spotify.com/v1/me', headers=headers)
+
+    if response.status_code == 200:
+        return print('True')
+    else:
+        return print('False')
+
 
 
 
@@ -2848,14 +2866,14 @@ def load_skipped_albums_list(file_name):
     try:
         with open(file_name, "r") as f:
             for line in f:
-                parts = line.strip().split(" - ")
+                parts = line.strip().split(" - ", 1)  # only split on the first dash
                 if len(parts) == 2:
                     skipped_albums.add(tuple(parts))
                 else:
                     print(f"Invalid entry in skipped_albums file: {line.strip()}")
     except FileNotFoundError:
         pass
-
+    
     return skipped_albums
 
 # Saves a list of skipped albums to a file
@@ -2875,6 +2893,17 @@ def remove_special_editions(album_name):
 
     return modified_album_name.strip()
 
+def get_with_retry(url, headers, max_retries=3):
+    retries = 0
+    while retries < max_retries:
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()  # raises an HTTPError if the response status isn't '200 OK'
+            return response
+        except (requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+            print(f"Error occurred: {e}, retrying...")
+            retries += 1
+    return None
 
 
 
