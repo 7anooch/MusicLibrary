@@ -34,6 +34,12 @@ LASTFM_USER = config['lastfm']['user']
 SPOTIFY_REDIRECT_URI = config['spotify']['redirect_uri']
 SPOTIFY_SCOPE = config['spotify']['scope']
 db_name = config['database']['name']
+SCRAPERAPI_KEY = config['scraperapi']['key']
+
+if config['scraperapi']['use'] == 'yes':
+    USE_SCRAPER = True
+else:
+    USE_SCRAPER = False
 
 
 # discogs_client.user_agent = "MusicLibrary/0.1"  # Replace with your app name and version
@@ -57,24 +63,22 @@ cursor = conn.cursor()
 #for album_id, spotify_url in album_data:
 #    spotify_uri = url_to_uri(spotify_url)
 #    cursor.execute("UPDATE albums SET spotify_uri = ? WHERE album_id = ?", (spotify_uri, album_id))
-#setup_database(db_name)
-
-#update_album_ids(conn)
 
 #add_latest_timestamp_to_updates(conn)
 
-
 # update_album_mbid(conn)
+
+
+# update_rym_genres(conn, use_scraperapi=USE_SCRAPER)
+# update_release_info(conn)
+# update_albums_with_cover_arts(conn, LASTFM_API_KEY)
 # update_artists_with_images(conn)
-# update_rym_genres(conn)
 # stoken = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
 # update_spotify_data(conn, stoken)
 # update_albums_with_lastfm_release_years(conn, LASTFM_API_KEY)
-# update_release_info(conn)
-# update_albums_with_cover_arts(conn, LASTFM_API_KEY)
 
 
-#update_release_types(conn)
+
 # Commit the changes to the database
 conn.commit()
 

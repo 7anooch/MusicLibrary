@@ -12,7 +12,6 @@ import rymscraper
 from rymscraper import RymUrl
 from rapidfuzz import fuzz, process 
 import selenium.common.exceptions
-# from rymscraper import rymscraper, RymUrl
 
 with open('keys.json', 'r') as f:
     config = json.load(f)
@@ -25,9 +24,8 @@ LASTFM_USER = config['lastfm']['user']
 SPOTIFY_REDIRECT_URI = config['spotify']['redirect_uri']
 SPOTIFY_SCOPE = config['spotify']['scope']
 db_name = config['database']['name']
-
-d = discogs_client.Client("MusicLibrary/0.1", user_token="qZyMePZYycAXQXPGyfCyFEYvYgbWPVSkdGQAGggK")  # Replace with your API key
-SCRAPERAPI_KEY = "e9ad0fc821407a12f4bc8a0c2476abcf"
+d = discogs_client.Client("MusicLibrary/0.1", user_token=config['discogs']['token'])  # Replace with your API key
+SCRAPERAPI_KEY = config['scraperapi']['key']
 MUSICBRAINZ_API_URL = "https://musicbrainz.org/ws/2/"
 
 USER_AGENTS = [
@@ -191,14 +189,23 @@ def get_lastfm_cover_art_url(api_key, artist_name, album_name):
 def update_artists_with_images(conn):
     cursor = conn.cursor()
 
+    # Check if the file exists. If it does, read it. Otherwise, create an empty list.
+    if os.path.exists('unfound_artist_images.txt'):
+        with open('unfound_artist_images.txt', 'r') as f:
+            existing_artists = f.read().splitlines()
+    else:
+        existing_artists = []
+
     cursor.execute("SELECT artist_id, artist_name FROM artists WHERE artist_image IS NULL")
     artists = cursor.fetchall()
 
-    not_found_artists = []
+    not_found_artists = []  # list to store artists for which images are not found
 
     for artist_id, artist_name in artists:
         if artist_name:  # Check if the artist_name is not None
-            time.sleep(0.5)
+            if artist_name in existing_artists:
+                continue
+
             artist_image_url = get_lastfm_artist_image(artist_name)
 
             if artist_image_url:
@@ -210,7 +217,13 @@ def update_artists_with_images(conn):
         else:
             print("Artist name is None")
 
+    # Write to the file in append mode once after all artists have been processed
+    with open('unfound_artist_images.txt', 'a') as f:
+        for artist in not_found_artists:
+            f.write(f"{artist}\n")
+
     conn.commit()
+
 
     # Write the list of not found artists to a text file
     with open("not_found_artists.txt", "w") as f:
@@ -646,7 +659,6 @@ def fetch_and_save_scrobbles(conn, api_key, user):
         print(f"Page {PAGE} completed. Total scrobbles saved so far: {total_scrobbles}")
         
         PAGE += 1
-
 
 
 
@@ -1405,7 +1417,9 @@ def search_album_on_rym(artist, album_title):
     return "https://rateyourmusic.com" + album_page_url
 
 # Updates albums with RYM genres if not already set
-def update_rym_genres(conn):
+def update_rym_genres(conn, use_scraperapi=False):
+    if use_scraperapi == True:
+        print("using scraperAPI")
     cursor = conn.cursor()
 
     skipped_albums_file = "skipped_albums.txt"
@@ -1427,13 +1441,12 @@ def update_rym_genres(conn):
 
         rym_url_dashes, rym_url_underscores = generate_rym_url(conn, artist_name, album_name, release_type, album_id, num_tracks)
         
-    #    genres = get_genres_from_rym(rym_url_dashes, use_scraperapi=False)
-        genres = get_rym_genres(artist_name, album_name, network)
-
-        #genres = get_rym_genres(network, rym_url_dashes)
-        #if not genres:
-    #        genres = get_genres_from_rym(rym_url_underscores, use_scraperapi=False)
-#            genres = get_rym_genres(network, rym_url_underscores)
+        if use_scraperapi:
+            genres = get_genres_from_rym(rym_url_dashes, use_scraperapi=True)
+            if not genres:
+                genres = get_genres_from_rym(rym_url_underscores, use_scraperapi=True)
+        else:
+            genres = get_rym_genres(artist_name, album_name, network)
 
         if genres:
             cursor.execute("UPDATE albums SET genre=? WHERE album_name=? AND artist_name=?", (genres, album_name, artist_name))
@@ -1446,6 +1459,7 @@ def update_rym_genres(conn):
 
     network.browser.close()
     network.browser.quit()
+
 
 # Generates two RYM URLs for a given album (with dashes and underscores)
 def generate_rym_url(conn, artist, album_title, release_type, album_id, num_tracks):
@@ -1551,16 +1565,28 @@ def main():
     if not check_if_table_exists(conn, "albums"):
         print("First time running in this directory. Setting up the database...")
         first_time_functions(conn)
+        print("Setup complete. Run again to perform updates.")
     else:
+        conn = sqlite3.connect(db_name)
         print("Database exists. Checking if it's populated...")
-        if (check_if_populated(conn, "albums") and 
-            check_if_populated(conn, "artists") and 
-            check_if_populated(conn, "saved_albums")):
-            print("Database is populated. Running other functions...")
-            update_databases(conn, LASTFM_USER, LASTFM_API_KEY, access_token)
+        if (check_if_table_exists(conn, "albums") and 
+            check_if_table_exists(conn, "artists") and 
+            check_if_table_exists(conn, "saved_albums")):
+            if (check_if_populated(conn, "albums") and 
+                check_if_populated(conn, "artists") and 
+                check_if_populated(conn, "saved_albums")):
+                print("Database is populated. Running other functions...")
+                if should_execute_function(conn):
+                     update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
+                     set_last_executed_date(conn, datetime.datetime.now())
+            else:
+                print("Database is not fully populated. Setting up the database...")
+                first_time_functions(conn)
+                print("Setup complete. Run again to perform updates.")
         else:
-            print("Database is not fully populated. Setting up the database...")
+            print("First time running in this directory. Setting up the database...")
             first_time_functions(conn)
+            print("Setup complete. Run again to perform updates.")
     conn.close()
 
 # Creates a table for saved albums if it doesn't exist
@@ -2218,7 +2244,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done( "update_albums_with_lastfm_release_years" ,update_albums_with_lastfm_release_years, conn, LASTFM_API_KEY)
     execute_if_not_done( "update_album_mbid" , update_album_mbid, conn)
     execute_if_not_done( "update_release_info" , update_release_info, conn)
-    execute_if_not_done( "update_rym_genres" , update_rym_genres, conn)
+    execute_if_not_done( "update_rym_genres" , update_rym_genres, conn, use_scraperapi=USE_SCRAPER)
     execute_if_not_done( "update_albums_with_cover_arts" ,update_albums_with_cover_arts, conn, LASTFM_API_KEY)
     execute_if_not_done( "update_artists_with_images",update_artists_with_images, conn)
 
@@ -2731,7 +2757,6 @@ def first_time_functions(conn):
     execute_if_not_done("update_last_played", update_last_played_in_artists, conn)
     execute_if_not_done( "remove duplicate albums", remove_duplicates_albums, conn)
 
-
 # ----- Misc functions ------
 # Compares two strings after removing any text within parentheses or brackets.
 def ignore_parentheses_and_brackets(string1, string2):
@@ -2797,34 +2822,6 @@ def update_genre(conn, current_genre, new_genre):
     cursor.execute(query, (current_genre, new_genre, f"%{current_genre}%"))
 
     # Commit the changes and close the cursor
-    conn.commit()
-    cursor.close()
-
-# Replaces semicolons with commas in the 'genres' column
-def replace_semicolons_with_commas(conn):
-    # Create a new cursor object
-    cursor = conn.cursor()
-
-    # Update the 'genres' column by replacing semicolons with commas
-    query = "UPDATE albums SET genres = REPLACE(genres, ';', ',')"
-    cursor.execute(query)
-
-    # Commit the changes and close the cursor
-    conn.commit()
-    cursor.close()
-
-# Removes a specified genre from the albums in the database
-def remove_genre(conn, genre_to_remove):
-    # Create a new cursor object
-    cursor = conn.cursor()
-
-    # Replace the target genre with an empty string, and remove leading and trailing commas
-    query = f"""
-        UPDATE albums
-        SET genres = trim(replace(',' || genres || ',', ',{genre_to_remove},', ','), ',')
-    """
-
-    cursor.execute(query)
     conn.commit()
     cursor.close()
 

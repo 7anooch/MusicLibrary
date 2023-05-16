@@ -12,6 +12,13 @@
   },
   "database": {
     "name": "MusicLibrary.db"
+  },
+    "scraperapi": {
+    "key": "[your scraperapi key]",
+    "use": "no"
+  },
+  "discogs": {
+    "token": "[your discogs token]"
   }
 }
 
