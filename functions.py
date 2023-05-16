@@ -1436,7 +1436,7 @@ def update_rym_genres(conn, use_scraperapi=False):
             continue
 
         if x % 3 == 0 and use_scraperapi==False:
-            time.sleep(30)
+            time.sleep(15)
         x += 1
 
         rym_url_dashes, rym_url_underscores = generate_rym_url(conn, artist_name, album_name, release_type, album_id, num_tracks)
@@ -2869,10 +2869,12 @@ def remove_special_editions(album_name):
     if album_name is None:
         return ""
 
-    pattern = r'(\[.*\]|\(.*\)|\{.*\})'
+    words = ['edition', 'anniversary', 'bonus', 'reissue', 'issue', 'deluxe', 'remaster', 'remastered', 'version']
+    pattern = r'(\[.*(' + '|'.join(words) + ').*\]|\(.*(' + '|'.join(words) + ').*\)|\{.*(' + '|'.join(words) + ').*\})'
     modified_album_name = re.sub(pattern, '', album_name, flags=re.IGNORECASE)
 
     return modified_album_name.strip()
+
 
 
 
