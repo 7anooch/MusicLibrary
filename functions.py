@@ -1442,9 +1442,13 @@ def update_rym_genres(conn, use_scraperapi=False):
         rym_url_dashes, rym_url_underscores = generate_rym_url(conn, artist_name, album_name, release_type, album_id, num_tracks)
         
         if use_scraperapi:
-            genres = get_genres_from_rym(rym_url_dashes, use_scraperapi=True)
-            if not genres:
-                genres = get_genres_from_rym(rym_url_underscores, use_scraperapi=True)
+            try:
+                genres = get_genres_from_rym(rym_url_dashes, use_scraperapi=True)
+                if not genres:
+                    genres = get_genres_from_rym(rym_url_underscores, use_scraperapi=True)
+            except requests.exceptions.ConnectTimeout:
+                print(f"Timeout when trying to get genres for {artist_name} - {album_name}")
+                continue
         else:
             genres = get_rym_genres(artist_name, album_name, network)
 
@@ -1459,6 +1463,7 @@ def update_rym_genres(conn, use_scraperapi=False):
 
     network.browser.close()
     network.browser.quit()
+
 
 
 # Generates two RYM URLs for a given album (with dashes and underscores)
