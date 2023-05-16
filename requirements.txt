@@ -1,0 +1,10 @@
+requests
+spotipy
+schedule
+musicbrainzngs
+discogs_client
+pylast
+datetime
+bs4
+matplotlib
+rapidfuzz
