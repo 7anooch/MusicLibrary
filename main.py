@@ -20,7 +20,6 @@ SPOTIFY_REDIRECT_URI = config['spotify']['redirect_uri']
 SPOTIFY_SCOPE = config['spotify']['scope']
 db_name = config['database']['name']
 
-
 SPOTIFY_REDIRECT_URI = 'http://localhost:8080/callback'
 
 class CoverLoader(QRunnable):
