@@ -1,26 +1,11 @@
-import requests
+import requests, spotipy, base64, os, webbrowser, sqlite3, json, schedule, time, datetime, pylast, re
+import musicbrainzngs, discogs_client, requests.exceptions, sys, urllib.parse
 import matplotlib.pyplot as plt
-import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-import base64
-import os
-import webbrowser
 from urllib.parse import urlencode, urlparse, parse_qs
-import sqlite3
-import json
-import schedule
-import time
 from functions import *
-import musicbrainzngs
-import discogs_client
-import pylast
-import re
-import requests.exceptions
-import urllib.parse
-import sys
-import datetime
+from lastfm_functions import *
 from rapidfuzz import fuzz, process 
-
 
 with open('keys.json', 'r') as f:
     config = json.load(f)
@@ -43,7 +28,7 @@ else:
 
 
 # discogs_client.user_agent = "MusicLibrary/0.1"  # Replace with your app name and version
-# d = discogs_client.Client("MusicLibrary/0.1", user_token="qZyMePZYycAXQXPGyfCyFEYvYgbWPVSkdGQAGggK")  # Replace with your API key
+d = discogs_client.Client("MusicLibrary/0.1", user_token=config['discogs']['token'])
 musicbrainzngs.set_useragent("YourAppName", "0.1", "7anooch@gmail.com")
 
 
@@ -53,7 +38,7 @@ conn = sqlite3.connect(db_name, isolation_level=None)
 conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
 
 #fetch_scrobbles_and_save_to_db(conn)
-#fetch_missing_scrobbles(LASTFM_API_KEY, LASTFM_USER, conn)
+#(LASTFM_API_KEY, LASTFM_USER, conn)
 #delete_duplicate_scrobbles(conn)
  
 
@@ -73,9 +58,13 @@ cursor = conn.cursor()
 # update_release_info(conn)
 # update_albums_with_cover_arts(conn, LASTFM_API_KEY)
 # update_artists_with_images(conn)
-# stoken = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
-# update_spotify_data(conn, stoken)
 # update_albums_with_lastfm_release_years(conn, LASTFM_API_KEY)
+stoken = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
+is_spotify_token_valid(stoken)
+#update_missing_album_data(conn, stoken)
+update_spotify_data(conn, stoken)
+
+
 
 
 
