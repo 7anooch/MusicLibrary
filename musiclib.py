@@ -5,6 +5,9 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from urllib.parse import urlencode, urlparse, parse_qs
 from functions import *
 from lastfm_functions import *
+from musicbrainz_functions import *
+from spotify_functions import *
+from rym_functions import *
 from rapidfuzz import fuzz, process 
 
 with open('keys.json', 'r') as f:
@@ -59,10 +62,10 @@ cursor = conn.cursor()
 # update_albums_with_cover_arts(conn, LASTFM_API_KEY)
 # update_artists_with_images(conn)
 # update_albums_with_lastfm_release_years(conn, LASTFM_API_KEY)
-stoken = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
-is_spotify_token_valid(stoken)
-#update_missing_album_data(conn, stoken)
-update_spotify_data(conn, stoken)
+# stoken = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
+# is_spotify_token_valid(stoken)
+# #update_missing_album_data(conn, stoken)
+# update_spotify_data(conn, stoken)
 
 
 
