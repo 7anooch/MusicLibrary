@@ -6,6 +6,7 @@ from urllib.parse import quote_plus
 from requests.exceptions import ConnectTimeout
 from pylast import PyLastError
 from rapidfuzz import fuzz, process 
+from functions import *
 
 with open('keys.json', 'r') as f:
 	config = json.load(f)
@@ -360,3 +361,26 @@ def is_spotify_token_valid(access_token):
 		return print('True')
 	else:
 		return print('False')
+
+
+# Insert new saved albums into saved_albums table
+def insert_new_saved_albums(conn, new_saved_albums):
+    print(new_saved_albums[:5])
+    cursor = conn.cursor()
+
+    for album in new_saved_albums:
+        artist_name, album_name = album
+        
+        # Check if the album already exists in the saved_albums table
+        cursor.execute('''SELECT COUNT(*) FROM saved_albums
+                          WHERE artist_name = ? AND album_name = ?''', (artist_name, album_name))
+        album_exists = cursor.fetchone()[0]
+
+        # If the album doesn't exist, insert it into the saved_albums table
+        if not album_exists:
+            cursor.execute('''INSERT INTO saved_albums (artist_name, album_name)
+                              VALUES (?, ?)''', (artist_name, album_name))
+            print(f"Inserted new saved album: {artist_name} - {album_name}")
+
+    conn.commit()
+    

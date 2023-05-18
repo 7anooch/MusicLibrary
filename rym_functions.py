@@ -9,6 +9,7 @@ import rymscraper
 from rymscraper import RymUrl
 from rapidfuzz import fuzz, process 
 import selenium.common.exceptions
+from functions import *
 
 
 with open('keys.json', 'r') as f:
@@ -237,3 +238,39 @@ def clean_for_rym_url(text):
 		normalized_text = normalized_text.replace(old, new)
 	return normalized_text
 
+
+def load_skipped_albums_list(file_name):
+    if not os.path.isfile(file_name):
+        return set()
+
+    skipped_albums = set()
+    try:
+        with open(file_name, "r") as f:
+            for line in f:
+                parts = line.strip().split(" - ", 1)  # only split on the first dash
+                if len(parts) == 2:
+                    skipped_albums.add(tuple(parts))
+                else:
+                    print(f"Invalid entry in skipped_albums file: {line.strip()}")
+    except FileNotFoundError:
+        pass
+    
+    return skipped_albums
+
+# Saves a list of skipped albums to a file
+def save_skipped_albums_list(skipped_albums_file, skipped_albums):
+    with open(skipped_albums_file, "w") as f:
+        for artist_name, album_name in skipped_albums:
+            f.write(f"{artist_name} - {album_name}\n")
+
+
+
+def remove_special_editions(album_name):
+    if album_name is None:
+        return ""
+
+    words = ['edition', 'anniversary', 'bonus', 'reissue', 'issue', 'deluxe', 'remaster', 'remastered', 'version']
+    pattern = r'(\[.*(' + '|'.join(words) + ').*\]|\(.*(' + '|'.join(words) + ').*\)|\{.*(' + '|'.join(words) + ').*\})'
+    modified_album_name = re.sub(pattern, '', album_name, flags=re.IGNORECASE)
+
+    return modified_album_name.strip()

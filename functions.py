@@ -738,6 +738,17 @@ def save_spotify_access_token(conn, client_id, client_secret, redirect_uri, scop
 def update_databases(conn, lastfm_username, lastfm_api_key):
     create_executed_functions_table(conn)
 
+    def is_spotify_token_valid(access_token):
+        headers = {
+        'Authorization': f'Bearer {access_token}'
+        }
+        response = requests.get('https://api.spotify.com/v1/me', headers=headers)
+
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
     def function_executed(conn, function_name):
         cursor = conn.cursor()
         cursor.execute("SELECT executed FROM executed_functions WHERE function_name=?", (function_name,))
@@ -750,10 +761,17 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
         conn.commit()
 
     def execute_if_not_done(func_name, func, conn, *args, **kwargs):
-        if not function_executed(conn, func_name):
-            func(conn, *args, **kwargs)
-            set_function_executed(conn, func_name)
-            print(f"----- {func_name} completed")
+        if func_name == 'spotify_access_token':
+            token = get_intermediate_result(conn, "spotify_access_token")
+            if not is_spotify_token_valid(token):
+                func(conn, *args, **kwargs)
+                set_function_executed(conn, func_name)
+                print(f"----- {func_name} completed")
+        else:
+            if not function_executed(conn, func_name):
+                func(conn, *args, **kwargs)
+                set_function_executed(conn, func_name)
+                print(f"----- {func_name} completed")
 
     print('----- starting update')
 
