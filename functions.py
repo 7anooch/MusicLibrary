@@ -32,6 +32,7 @@ d = discogs_client.Client("MusicLibrary/0.1", user_token=config['discogs']['toke
 SCRAPERAPI_KEY = config['scraperapi']['key']
 MUSICBRAINZ_API_URL = "https://musicbrainz.org/ws/2/"
 
+
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0',
@@ -102,6 +103,7 @@ def check_if_table_exists(conn, table_name):
 # Main function that connects to the database, updates data, and closes the connection
 def main(db_name=db_name):
     conn = sqlite3.connect(db_name)
+    conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
 
     if not check_if_table_exists(conn, "albums"):
         print("First time running in this directory. Setting up the database...")
@@ -736,7 +738,6 @@ def save_spotify_access_token(conn, client_id, client_secret, redirect_uri, scop
 
 # Updates various tables in the database with new data from Last.fm and Spotify
 def update_databases(conn, lastfm_username, lastfm_api_key):
-    create_executed_functions_table(conn)
 
     def is_spotify_token_valid(access_token):
         headers = {
@@ -763,7 +764,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     def execute_if_not_done(func_name, func, conn, *args, **kwargs):
         if func_name == 'spotify_access_token':
             token = get_intermediate_result(conn, "spotify_access_token")
-            if not is_spotify_token_valid(token):
+            if is_spotify_token_valid(token) == False:
                 func(conn, *args, **kwargs)
                 set_function_executed(conn, func_name)
                 print(f"----- {func_name} completed")
@@ -956,6 +957,8 @@ def add_latest_timestamp_to_updates(conn):
         print(f"Successfully saved the latest timestamp ({max_timestamp}) to the updates table.")
     else:
         print("No data found in the playlist table.")
+
+
 
 # Builds database with all the required tables
 def setup_database(conn, db_name):
