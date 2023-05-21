@@ -1,4 +1,4 @@
-import requests, spotipy, base64, webbrowser, json, sqlite3, schedule, time, pylast, re, random
+import requests, spotipy, base64, webbrowser, json, sqlite3, schedule, time, pylast, re, random, argparse
 import musicbrainzngs, discogs_client, requests.exceptions, urllib.parse, unicodedata, datetime, os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,8 +8,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 from requests.exceptions import ConnectTimeout
 from pylast import PyLastError
-import rymscraper
-from rymscraper import RymUrl
+from rymscraper import rymscraper, RymUrl
 from rapidfuzz import fuzz, process 
 import selenium.common.exceptions
 from lastfm_functions import *
@@ -101,35 +100,62 @@ def check_if_table_exists(conn, table_name):
     return cursor.fetchone() is not None
 
 # Main function that connects to the database, updates data, and closes the connection
-def main(db_name=db_name):
+def main(upgrade, db_name=db_name):
     conn = sqlite3.connect(db_name)
     conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
 
-    if not check_if_table_exists(conn, "albums"):
-        print("First time running in this directory. Setting up the database...")
-        first_time_functions(conn)
-        print("Setup complete. Run again to perform updates.")
-    else:
-        conn = sqlite3.connect(db_name)
-        print("Database exists. Checking if it's populated...")
-        if (check_if_table_exists(conn, "albums") and 
-            check_if_table_exists(conn, "artists") and 
-            check_if_table_exists(conn, "saved_albums")):
-            if (check_if_populated(conn, "albums") and 
-                check_if_populated(conn, "artists") and 
-                check_if_populated(conn, "saved_albums")):
-                print("Database is populated. Running other functions...")
-                if should_execute_function(conn):
-                     update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
-                     set_last_executed_date(conn, datetime.datetime.now())
-            else:
-                print("Database is not fully populated. Setting up the database...")
-                first_time_functions(conn)
-                print("Setup complete. Run again to perform updates.")
-        else:
+    if upgrade:
+        print('Upgrading...')
+        if not check_if_table_exists(conn, "albums"):
             print("First time running in this directory. Setting up the database...")
             first_time_functions(conn)
             print("Setup complete. Run again to perform updates.")
+        else:
+            conn = sqlite3.connect(db_name)
+            print("Database exists. Checking if it's populated...")
+            if (check_if_table_exists(conn, "albums") and 
+                check_if_table_exists(conn, "artists") and 
+                check_if_table_exists(conn, "saved_albums")):
+                if (check_if_populated(conn, "albums") and 
+                    check_if_populated(conn, "artists") and 
+                    check_if_populated(conn, "saved_albums")):
+                    print("Database is populated. Running other functions...")
+                    update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
+                    set_last_executed_date(conn, datetime.datetime.now())
+                else:
+                    print("Database is not fully populated. Setting up the database...")
+                    first_time_functions(conn)
+                    print("Setup complete. Run again to perform updates.")
+            else:
+                print("First time running in this directory. Setting up the database...")
+                first_time_functions(conn)
+                print("Setup complete. Run again to perform updates.")
+    else:
+        if not check_if_table_exists(conn, "albums"):
+            print("First time running in this directory. Setting up the database...")
+            first_time_functions(conn)
+            print("Setup complete. Run again to perform updates.")
+        else:
+            conn = sqlite3.connect(db_name)
+            print("Database exists. Checking if it's populated...")
+            if (check_if_table_exists(conn, "albums") and 
+                check_if_table_exists(conn, "artists") and 
+                check_if_table_exists(conn, "saved_albums")):
+                if (check_if_populated(conn, "albums") and 
+                    check_if_populated(conn, "artists") and 
+                    check_if_populated(conn, "saved_albums")):
+                    print("Database is populated. Running other functions...")
+                    if should_execute_function(conn):
+                         update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
+                         set_last_executed_date(conn, datetime.datetime.now())
+                else:
+                    print("Database is not fully populated. Setting up the database...")
+                    first_time_functions(conn)
+                    print("Setup complete. Run again to perform updates.")
+            else:
+                print("First time running in this directory. Setting up the database...")
+                first_time_functions(conn)
+                print("Setup complete. Run again to perform updates.")
     conn.close()
 
 # Creates a table for saved albums if it doesn't exist
@@ -619,7 +645,8 @@ def should_execute_function(conn):
     if last_executed_date:
         return current_date != last_executed_date.date()
     else:
-        # Return True or whatever is appropriate when last_executed_date is None
+        # Return True and set a last_executed_date when last_executed_date is None
+        set_last_executed_date(datetime.datetime.now())
         return True
 
 
@@ -774,8 +801,8 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
                 set_function_executed(conn, func_name)
                 print(f"----- {func_name} completed")
 
+    reset_executed_functions_if_all_done(conn)
     print('----- starting update')
-
     execute_if_not_done('fetch_timestamp_lastfm', get_last_update_timestamp, conn, "lastfm")
     execute_if_not_done('fetch_timestamp_spotify', get_last_update_timestamp, conn, "spotify")
     lastfm_last_update = get_intermediate_result(conn, "lastfm_last_update")
@@ -821,6 +848,29 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
 
     reset_executed_functions(conn)
     print('----- update complete')
+
+def reset_executed_functions_if_all_done(conn):
+    cursor = conn.cursor()
+    
+    # Check if all executed tags are set to 1
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM executed_functions
+        WHERE executed = 0
+    """)
+    not_executed_count = cursor.fetchone()[0]
+    
+    # If there are no rows where executed is 0 (i.e., all are 1)
+    if not_executed_count == 0:
+        cursor.execute("""
+            UPDATE executed_functions
+            SET executed = 0
+        """)
+        conn.commit()
+        print("Successfully reset all executed tags.")
+    else:
+        print("Not all functions have been executed yet.")
+
 
 # Resets the executed status of all functions in executed_functions table
 def reset_executed_functions(conn):
@@ -940,6 +990,7 @@ def update_album_ids(conn):
 
 # ----------- NEW ------------
 def add_latest_timestamp_to_updates(conn):
+    """adds a lastfm last_pdate timestamp based on the last song in playlist"""
     cursor = conn.cursor()
     
     # Fetch the maximum timestamp from the 'playlist' table
@@ -958,6 +1009,21 @@ def add_latest_timestamp_to_updates(conn):
     else:
         print("No data found in the playlist table.")
 
+def add_current_timestamp_to_updates(conn):
+    """adds a spotify last_update timestamp based on the current time"""
+    cursor = conn.cursor()
+    
+    # Get the current timestamp as a Unix timestamp
+    current_timestamp = int(time.time())
+    
+    # Insert current timestamp into the 'updates' table
+    insert_query = """
+    INSERT INTO updates (source, last_update)
+    VALUES (?, ?)
+    """
+    cursor.execute(insert_query, ('spotify', current_timestamp))
+    conn.commit()
+    print(f"Successfully saved the current Unix timestamp ({current_timestamp}) to the updates table.")
 
 
 # Builds database with all the required tables
@@ -1319,6 +1385,7 @@ def first_time_functions(conn):
     execute_if_not_done( "update scrobble count", update_albums_table_scrobbles, conn)
     token = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
     execute_if_not_done( "save saved albums", save_spotify_saved_albums_to_db, conn, token)
+    execute_if_not_done( "add spotify update timestamp", add_current_timestamp_to_updates, conn)
     execute_if_not_done( "clean saved albums", clean_saved_album_names, conn)
     execute_if_not_done( "updated saved spotify albums", update_saved_spotify_albums, conn)
     execute_if_not_done( "delete incomplete albums", delete_incomplete_albums, conn)

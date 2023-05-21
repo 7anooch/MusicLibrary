@@ -8,6 +8,7 @@ from pylast import PyLastError
 from rapidfuzz import fuzz, process 
 from lastfm_functions import *
 
+
 with open('keys.json', 'r') as f:
     config = json.load(f)
 
@@ -277,7 +278,7 @@ def update_release_info(conn):
 
     for album in albums:
         album_id, mbid = album
-
+        
         if mbid is None:
             continue
 
@@ -321,12 +322,15 @@ def update_release_info(conn):
                 conn.commit()  # Commit the changes to the database
                 print(f"Committed updates for {update_count} albums.")
 
+        except musicbrainzngs.ResponseError as err:
+            print(f"Response error with album {album_id}, MBID {mbid}: {err}")
         except musicbrainzngs.MusicBrainzError as e:
             print(f"Error fetching release info for album {album_id}: {e}")
 
     if update_count % 25 != 0:  # If the last batch was less than 25
         conn.commit()  # Commit the remaining updates
         print(f"Committed updates for {update_count} albums.")
+
 
 
 

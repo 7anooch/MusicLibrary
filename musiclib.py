@@ -1,5 +1,5 @@
 import requests, spotipy, base64, os, webbrowser, sqlite3, json, schedule, time, datetime, pylast, re
-import musicbrainzngs, discogs_client, requests.exceptions, sys, urllib.parse
+import musicbrainzngs, discogs_client, requests.exceptions, sys, urllib.parse, argparse
 import matplotlib.pyplot as plt
 from spotipy.oauth2 import SpotifyClientCredentials
 from urllib.parse import urlencode, urlparse, parse_qs
@@ -55,8 +55,8 @@ cursor = conn.cursor()
 #add_latest_timestamp_to_updates(conn)
 
 # update_album_mbid(conn)
-
-
+#reset_executed_functions(conn)
+# update_albums_with_release_years(conn)
 # update_rym_genres(conn, use_scraperapi=USE_SCRAPER)
 # update_release_info(conn)
 # update_albums_with_cover_arts(conn, LASTFM_API_KEY)
@@ -84,10 +84,10 @@ conn.commit()
 #conn.close()
 
 if __name__ == "__main__":
-    main()
-    table_name = 'tracks'
-    num_entries = count_entries_in_table(table_name)
-    print(f"The {table_name} table has {num_entries} entries.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--upgrade', action='store_true', help='upgrade the database')
+    args = parser.parse_args()
+    main(args.upgrade)
     table_name = 'saved_albums'
     num_entries = count_entries_in_table(table_name)
     print(f"The {table_name} table has {num_entries} entries.")
