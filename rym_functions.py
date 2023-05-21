@@ -5,11 +5,9 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 from requests.exceptions import ConnectTimeout
 from pylast import PyLastError
-import rymscraper
-from rymscraper import RymUrl
+from rymscraper import rymscraper
 from rapidfuzz import fuzz, process 
 import selenium.common.exceptions
-from functions import *
 
 
 with open('keys.json', 'r') as f:
@@ -87,25 +85,38 @@ def get_genres_from_rym(rym_url, use_scraperapi=True):
 	return ", ".join(genres) if genres else False
 
 def get_rym_genres(artist_name, album_name, network, retry_attempts=3, retry_delay=5):
-	""" Gets genres for an album from RateYourMusic"""
-	search_query = f"{artist_name} - {album_name}"
+    """ Gets genres for an album from RateYourMusic"""
+    search_query = f"{artist_name} - {album_name}"
 
-	for attempt in range(retry_attempts):
-		try:
-			album_infos = network.get_album_infos(name=search_query)
-			genres = album_infos["Genres"]
-			genres = genres.replace('\n', ', ')  # Replace line breaks with a comma and space
-			return genres
-		except (AttributeError, IndexError, TypeError):
-			print(f"Couldn't fetch RYM genres for {artist_name} - {album_name}")
-			return None
-		except selenium.common.exceptions.WebDriverException:
-			if attempt < retry_attempts - 1:
-				print(f"Attempt {attempt+1} of {retry_attempts} failed. Retrying in {retry_delay} seconds...")
-				time.sleep(retry_delay)
-			else:
-				print(f"All attempts failed for {artist_name} - {album_name}. Please check your network connection and ensure rateyourmusic.com is online.")
-				return None
+    for attempt in range(retry_attempts):
+        try:
+            album_infos = network.get_album_infos(name=search_query)
+
+            if "Genres" in album_infos:
+                genres = album_infos["Genres"]
+                genres = genres.replace('\n', ', ')  # Replace line breaks with a comma and space
+                return genres
+            else:
+                print(f"No 'Genres' found in album info for {artist_name} - {album_name}")
+                return None
+
+        except AttributeError as e:
+            print(f"AttributeError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
+            return None
+        except IndexError as e:
+            print(f"IndexError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
+            return None
+        except TypeError as e:
+            print(f"TypeError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
+            return None
+        except selenium.common.exceptions.WebDriverException as e:
+            if attempt < retry_attempts - 1:
+                print(f"Attempt {attempt+1} of {retry_attempts} failed with WebDriverException: {e}. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                print(f"All attempts failed for {artist_name} - {album_name}. Please check your network connection and ensure rateyourmusic.com is online.")
+                return None
+
 
 # NOT CURRENTLY USED
 def search_album_on_rym(artist, album_title):
@@ -167,6 +178,9 @@ def update_rym_genres(conn, use_scraperapi=False):
 			cursor.execute("UPDATE albums SET genre=? WHERE album_name=? AND artist_name=?", (genres, album_name, artist_name))
 			conn.commit()
 			print(f"Updated RYM genres for {artist_name} - {album_name}: {genres}")
+		elif use_scraperapi==False:
+			skipped_albums.add((artist_name, album_name))
+			save_skipped_albums_list(skipped_albums_file, skipped_albums)
 		else:
 			print(f"Couldn't fetch RYM genres for {artist_name} - {album_name}")
 			skipped_albums.add((artist_name, album_name))
