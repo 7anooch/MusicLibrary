@@ -400,8 +400,17 @@ def update_album_durations(conn):
     for album in albums:
         album_id, spotify_id = album
 
+        # If spotify_id is None, skip this iteration
+        if spotify_id is None:
+            print(f"Skipping album {album_id} due to missing Spotify ID")
+            continue
+
         # Fetch the album from the Spotify API
-        spotify_album = sp.album(spotify_id)
+        try:
+            spotify_album = sp.album(spotify_id)
+        except spotipy.exceptions.SpotifyException as e:
+            print(f"Error fetching album {album_id} from Spotify: {e}")
+            continue
 
         # Calculate total album duration
         total_duration_ms = sum(track['duration_ms'] for track in spotify_album['tracks']['items'])
@@ -412,6 +421,7 @@ def update_album_durations(conn):
     
     # Commit the changes and close the connection
     conn.commit()
+
 
 def update_spotify_ids(conn):
     cursor = conn.cursor()
