@@ -104,7 +104,7 @@ def main(update, db_name=db_name):
     conn = sqlite3.connect(db_name)
     conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
 
-    if upgrade:
+    if update:
         print('Updating...')
         if not check_if_table_exists(conn, "albums"):
             print("First time running in this directory. Setting up the database...")
