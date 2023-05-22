@@ -191,14 +191,14 @@ def update_albums_with_release_years(conn):
 
     conn.commit()
 
-def search_release_mbid(artist_name, album_name, max_retries=5):
+def search_release_mbid(artist_name, album_name, max_retries=3):
     """ Searches for MusicBrainz release MBID using artist and album names """
     with open("missing_mbid.txt", "a+") as missing_file:
         missing_file.seek(0)
         missing_entries = missing_file.readlines()
         entry = f"{artist_name} - {album_name}\n"
         if entry in missing_entries:
-            print(f"Skipping {artist_name} - {album_name} (already in missing_mbid.txt)")
+          #  print(f"Skipping {artist_name} - {album_name} (already in missing_mbid.txt)")
             return None
 
     query = f'artist:"{artist_name}" release:"{album_name}"'
@@ -278,7 +278,7 @@ def update_release_info(conn):
 
     for album in albums:
         album_id, mbid = album
-        
+
         if mbid is None:
             continue
 
@@ -289,10 +289,10 @@ def update_release_info(conn):
             release_group = release["release-group"]
 
             # Get the primary type of the release group
-            release_type = release_group.get("primary-type", "N/A")
+            release_type = release_group.get("primary-type", "album")
 
             # Get the country of release
-            country = release.get("country", "N/A")
+            country = release.get("country", "XW")
 
             # Calculate the release length (sum of track durations) in minutes and the total number of tracks
             release_length = 0
@@ -330,9 +330,6 @@ def update_release_info(conn):
     if update_count % 25 != 0:  # If the last batch was less than 25
         conn.commit()  # Commit the remaining updates
         print(f"Committed updates for {update_count} albums.")
-
-
-
 
 
 
