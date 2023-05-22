@@ -8,3 +8,4 @@ datetime
 bs4
 matplotlib
 rapidfuzz
+PyQt5
