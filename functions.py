@@ -125,11 +125,13 @@ def main(upgrade, db_name=db_name):
                 else:
                     print("Database is not fully populated. Setting up the database...")
                     first_time_functions(conn)
-                    print("Setup complete. Run again to perform updates.")
+                    print("Setup complete. Upgrading now.")
+                    update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
             else:
                 print("First time running in this directory. Setting up the database...")
                 first_time_functions(conn)
-                print("Setup complete. Run again to perform updates.")
+                print("Setup complete. Upgrading now.")
+                update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
     else:
         if not check_if_table_exists(conn, "albums"):
             print("First time running in this directory. Setting up the database...")
@@ -520,8 +522,11 @@ def delete_unwanted_albums_and_artists(conn):
 
     # Delete albums with num_tracks = 1 and scrobble_count = 1, unless saved is not NULL
     cursor.execute("DELETE FROM albums WHERE num_tracks = 1 AND scrobble_count = 1 AND saved IS NULL")
-    
     deleted_album_rows = cursor.rowcount
+    cursor.execute("DELETE FROM albums WHERE num_tracks = 1 AND scrobble_count = 2 AND saved IS NULL AND release_length < 15 AND tracks_mb < 3")
+    deleted_album_rows += cursor.rowcount
+    cursor.execute("DELETE FROM albums WHERE num_tracks = 2 AND scrobble_count = 2 AND saved IS NULL AND release_length < 15 AND tracks_mb < 3")
+    deleted_album_rows += cursor.rowcount
     print(f"Deleted {deleted_album_rows} unwanted albums")
 
     # Delete artists not found in the albums table
@@ -646,7 +651,7 @@ def should_execute_function(conn):
         return current_date != last_executed_date.date()
     else:
         # Return True and set a last_executed_date when last_executed_date is None
-        set_last_executed_date(datetime.datetime.now())
+        set_last_executed_date(conn, datetime.datetime.now())
         return True
 
 
@@ -838,6 +843,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done( "update_albums_with_lastfm_release_years" ,update_albums_with_lastfm_release_years, conn, LASTFM_API_KEY)
     execute_if_not_done( "update_album_mbid" , update_album_mbid, conn)
     execute_if_not_done( "update_release_info" , update_release_info, conn)
+    execute_if_not_done("update spotify album length", update_album_durations, conn)
     execute_if_not_done( "update_rym_genres" , update_rym_genres, conn, use_scraperapi=USE_SCRAPER)
     execute_if_not_done( "update_albums_with_cover_arts" ,update_albums_with_cover_arts, conn, LASTFM_API_KEY)
     execute_if_not_done( "update_artists_with_images",update_artists_with_images, conn)
@@ -1063,6 +1069,7 @@ def setup_database(conn, db_name):
         country TEXT,
         release_length INTEGER,
         tracks_mb INTEGER,
+        spotify_id, TEXT,
         FOREIGN KEY (artist_id) REFERENCES artists(artist_id)
     )
     ''')
