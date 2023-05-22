@@ -394,7 +394,7 @@ def update_album_durations(conn):
                                                                client_secret=SPOTIFY_CLIENT_SECRET))
     cursor = conn.cursor()
     # Fetch all albums with release_length 0 or null
-    cursor.execute("SELECT id, spotify_id FROM albums WHERE release_length IS NULL OR release_length = 0")
+    cursor.execute("SELECT album_id, spotify_id FROM albums WHERE release_length IS NULL OR release_length = 0")
     albums = cursor.fetchall()
 
     for album in albums:
@@ -408,8 +408,24 @@ def update_album_durations(conn):
         total_duration_min = math.floor(total_duration_ms / 60000)  # convert ms to min and round down
 
         # Update the album's duration in the database
-        cursor.execute("UPDATE albums SET release_length = ? WHERE id = ?", (total_duration_min, album_id))
+        cursor.execute("UPDATE albums SET release_length = ? WHERE album_id = ?", (total_duration_min, album_id))
     
     # Commit the changes and close the connection
     conn.commit()
+
+def update_spotify_ids(conn):
+    cursor = conn.cursor()
+    cursor.execute("SELECT album_id, spotify_url FROM albums WHERE spotify_url IS NOT NULL AND spotify_id IS NULL")
+    rows = cursor.fetchall()
+
+    for row in rows:
+        album_id = row[0]
+        spotify_url = row[1]
+        spotify_id = re.search(r'(?<=album/)[^/]*$', spotify_url).group(0)
+
+        cursor.execute("UPDATE albums SET spotify_id=? WHERE album_id=?", (spotify_id, album_id))
+        print(f"Updated Spotify ID for album {album_id}: {spotify_id}")
+
+    conn.commit()
+    print("Updated Spotify IDs.")
 
