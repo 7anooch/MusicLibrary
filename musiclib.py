@@ -53,8 +53,12 @@ cursor = conn.cursor()
 #    cursor.execute("UPDATE albums SET spotify_uri = ? WHERE album_id = ?", (spotify_uri, album_id))
 
 #add_latest_timestamp_to_updates(conn)
-
+# delete_unwanted_albums_and_artists(conn)
 # update_album_mbid(conn)
+# update_release_info(conn)
+# update_spotify_ids(conn)
+# update_album_durations(conn)
+
 #reset_executed_functions(conn)
 # update_albums_with_release_years(conn)
 # update_rym_genres(conn, use_scraperapi=USE_SCRAPER)
@@ -66,7 +70,6 @@ cursor = conn.cursor()
 # is_spotify_token_valid(stoken)
 # #update_missing_album_data(conn, stoken)
 # update_spotify_data(conn, stoken)
-
 
 
 
@@ -85,9 +88,9 @@ conn.commit()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--upgrade', action='store_true', help='upgrade the database')
+    parser.add_argument('--update', action='store_true', help='upgrade the database')
     args = parser.parse_args()
-    main(args.upgrade)
+    main(args.update)
     table_name = 'saved_albums'
     num_entries = count_entries_in_table(table_name)
     print(f"The {table_name} table has {num_entries} entries.")

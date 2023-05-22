@@ -100,12 +100,12 @@ def check_if_table_exists(conn, table_name):
     return cursor.fetchone() is not None
 
 # Main function that connects to the database, updates data, and closes the connection
-def main(upgrade, db_name=db_name):
+def main(update, db_name=db_name):
     conn = sqlite3.connect(db_name)
     conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
 
     if upgrade:
-        print('Upgrading...')
+        print('Updating...')
         if not check_if_table_exists(conn, "albums"):
             print("First time running in this directory. Setting up the database...")
             first_time_functions(conn)
@@ -125,12 +125,12 @@ def main(upgrade, db_name=db_name):
                 else:
                     print("Database is not fully populated. Setting up the database...")
                     first_time_functions(conn)
-                    print("Setup complete. Upgrading now.")
+                    print("Setup complete. Updating now.")
                     update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
             else:
                 print("First time running in this directory. Setting up the database...")
                 first_time_functions(conn)
-                print("Setup complete. Upgrading now.")
+                print("Setup complete. Updating now.")
                 update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
     else:
         if not check_if_table_exists(conn, "albums"):
