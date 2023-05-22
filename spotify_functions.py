@@ -1,4 +1,4 @@
-import requests, spotipy, base64, webbrowser, json, sqlite3, schedule, time, pylast, re, random
+import requests, spotipy, base64, webbrowser, json, sqlite3, schedule, time, pylast, re, random, math
 import musicbrainzngs, discogs_client, requests.exceptions, urllib.parse, unicodedata, datetime, os
 from spotipy.oauth2 import SpotifyClientCredentials
 from urllib.parse import urlencode, urlparse, parse_qs
@@ -336,14 +336,17 @@ def update_spotify_data(conn, spotify_token):
 				continue
 			album_data = album_response.json()
 
+
 			if 'albums' in album_data and album_data['albums']['items']:
-				album_spotify_url = album_data['albums']['items'][0]['external_urls']['spotify']
-				release_year = album_data['albums']['items'][0]['release_date'][:4]  # extracting the year
-				cover_art_url = album_data['albums']['items'][0]['images'][0]['url'] if album_data['albums']['items'][0]['images'] else None
-				release_type = album_data['albums']['items'][0]['album_type']
-				cursor.execute("UPDATE albums SET spotify_url = ?, release_year = ?, cover_art_url = ?, release_type = ? WHERE album_id = ?", 
-							   (album_spotify_url, release_year, cover_art_url, release_type, album_id))
-				print(f"Updated Spotify URL, release year, release type, and cover art URL for album {artist_name} - {album_name}: {album_spotify_url}, {release_year}, {cover_art_url}")
+			    album_spotify_id = album_data['albums']['items'][0]['id']  # Fetch the Spotify ID
+			    album_spotify_url = album_data['albums']['items'][0]['external_urls']['spotify']
+			    release_year = album_data['albums']['items'][0]['release_date'][:4]  # extracting the year
+			    cover_art_url = album_data['albums']['items'][0]['images'][0]['url'] if album_data['albums']['items'][0]['images'] else None
+			    release_type = album_data['albums']['items'][0]['album_type']
+			    cursor.execute("UPDATE albums SET spotify_url = ?, release_year = ?, cover_art_url = ?, release_type = ?, spotify_id = ? WHERE album_id = ?", 
+			                   (album_spotify_url, release_year, cover_art_url, release_type, album_spotify_id, album_id))
+			    print(f"Updated Spotify URL, release year, release type, and cover art URL for album {artist_name} - {album_name}: {album_spotify_url}, {release_year}, {cover_art_url}")
+
 
 		except Exception as e:
 			print(f"Error fetching Spotify URL for album {artist_name} - {album_name}: {e}")
@@ -383,4 +386,30 @@ def insert_new_saved_albums(conn, new_saved_albums):
             print(f"Inserted new saved album: {artist_name} - {album_name}")
 
     conn.commit()
+
+
+def update_album_durations(conn):
+    # Establish Spotify API client
+    sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=SPOTIFY_CLIENT_ID,
+                                                               client_secret=SPOTIFY_CLIENT_SECRET))
+    cursor = conn.cursor()
+    # Fetch all albums with release_length 0 or null
+    cursor.execute("SELECT id, spotify_id FROM albums WHERE release_length IS NULL OR release_length = 0")
+    albums = cursor.fetchall()
+
+    for album in albums:
+        album_id, spotify_id = album
+
+        # Fetch the album from the Spotify API
+        spotify_album = sp.album(spotify_id)
+
+        # Calculate total album duration
+        total_duration_ms = sum(track['duration_ms'] for track in spotify_album['tracks']['items'])
+        total_duration_min = math.floor(total_duration_ms / 60000)  # convert ms to min and round down
+
+        # Update the album's duration in the database
+        cursor.execute("UPDATE albums SET release_length = ? WHERE id = ?", (total_duration_min, album_id))
     
+    # Commit the changes and close the connection
+    conn.commit()
+
