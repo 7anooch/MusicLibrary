@@ -69,7 +69,7 @@ class MusicLibraryApp(QWidget):
 
     def load_genres(self):
         cursor = self.db_handler.conn.cursor()
-        cursor.execute("SELECT DISTINCT rym_genre FROM albums")
+        cursor.execute("SELECT DISTINCT genre FROM albums")
         album_genres = cursor.fetchall()
 
         genres = set()
@@ -332,7 +332,7 @@ class MusicLibraryApp(QWidget):
         if selected_genres:
             genre_conditions = []
             for genre in selected_genres:
-                genre_conditions.append("rym_genre LIKE ?")
+                genre_conditions.append("genre LIKE ?")
                 params.append(f"%{genre}%")
             selected_operator = self.genre_operator_combobox.currentText()
             conditions.append("(" + f" {selected_operator} ".join(genre_conditions) + ")")
