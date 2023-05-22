@@ -8,7 +8,7 @@ A scraperAPI key is optional, but will help a good deal for getting RYM genres. 
 
 Run `pip install -r requirements.txt` for dependencies
 
-Run musiclib.py to set up the database and update it, run main.py for GUI (for now..)
+Run musiclib.py to set up the database and update it, run main.py for GUI (for now..). It will typically update once a day, but can be forced to update with the `--update` tag
 
 Setting up the whole thing takes quite a while if you have a lot of scrobbles/saved albums.
 
