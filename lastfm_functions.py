@@ -4,7 +4,8 @@ from urllib.parse import urlencode, urlparse, parse_qs
 from urllib.parse import quote_plus
 from requests.exceptions import ConnectTimeout
 from pylast import PyLastError
-from rapidfuzz import fuzz, process 
+from rapidfuzz import fuzz, process
+from functions import *
 
 with open('keys.json', 'r') as f:
     config = json.load(f)
