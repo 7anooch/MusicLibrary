@@ -10,5 +10,5 @@ Run `pip install -r requirements.txt` for dependencies
 
 Run musiclib.py to set up the database and update it, run main.py for GUI (for now..). It will typically update once a day, but can be forced to update with the `--update` tag
 
-Setting up the whole thing takes quite a while if you have a lot of scrobbles/saved albums.
+Setting up the whole thing takes quite a while if you have a lot of scrobbles/saved albums so you'll probably wanna run it and forget about it for a day or so (assuming it doesn't break..) but it should set things up correctly even if you abort it several times in the process. It's really only meant for albums so I try to have it remove singles but it's tricky (is an hour-long song a single?) so I err on the side of caution, so you'll likely want to go through the database and clean stuff up yourself. Last.fm data isn't clean (And neither is Spotify's to an extent, so it can't be helped, though I do try to have it do a bit of cleaning.
 
