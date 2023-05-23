@@ -770,7 +770,20 @@ def save_spotify_access_token(conn, client_id, client_secret, redirect_uri, scop
 
 # Updates various tables in the database with new data from Last.fm and Spotify
 def update_databases(conn, lastfm_username, lastfm_api_key):
-
+    cursor = conn.cursor()
+    function_names = ["fetch_timestamp_lastfm", "fetch_timestamp_spotify", "spotify_access_token", "save_recent_saved_albums", 
+                      "parse_and_insert_saved_albums", "set_last_update_timestamp_spotify", "create_new_tracks_table",
+                      "create_new_playlist_table", "create_new_albums_table", "insert_scrobbles_into_new_playlist", 
+                      "populate_new_tracks_table", "populate_new_albums_table", "update_album_track_counts", 
+                      "update_album_scrobble_counts", "set_last_update_timestamp_lastfm", "append_and_update_albums", 
+                      "update_albums_with_missing_ids", "update_last_played", "update_artist_and_album_urls", 
+                      "delete_unwanted_albums_and_artists", "update data from spotify", "update_albums_with_lastfm_release_years", 
+                      "update_album_mbid", "update_release_info", "update spotify album length", "update_rym_genres", 
+                      "update_albums_with_cover_arts", "update_artists_with_images", "drop_tables"]
+    for func_name in function_names:
+        cursor.execute("INSERT OR IGNORE INTO executed_functions (function_name, executed) VALUES (?, 0)", (func_name,))
+    conn.commit()
+    
     def is_spotify_token_valid(access_token):
         headers = {
         'Authorization': f'Bearer {access_token}'
@@ -1363,8 +1376,16 @@ def create_setup_functions_table(conn):
     conn.commit()
 
 def first_time_functions(conn):
-
     create_setup_functions_table(conn)
+    cursor = conn.cursor()
+
+    function_names = ["setup database", "fetch scrobbles", "add latest scrobble timestamp", "clean album names in playlist",
+                      "populate tracks table", "populate albums table", "update scrobble count", "save saved albums",
+                      "add spotify update timestamp", "clean saved albums", "updated saved spotify albums", 
+                      "delete incomplete albums", "delete unwanted albums", "update_last_played", "remove duplicate albums"]
+    for func_name in function_names:
+        cursor.execute("INSERT OR IGNORE INTO setup_functions (function_name, executed) VALUES (?, 0)", (func_name,))
+    conn.commit()
 
     def function_executed(conn, function_name):
         cursor = conn.cursor()
