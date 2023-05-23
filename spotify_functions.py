@@ -207,7 +207,6 @@ def update_artist_and_album_urls(conn, spotify_token):
 	for album_id, artist_name, album_name, album_spotify_url in albums:
 		album_search_url = f'https://api.spotify.com/v1/search?q=album:{urllib.parse.quote(str(album_name))}%20artist:{urllib.parse.quote(str(artist_name))}&type=album&limit=1'
 
-#        album_search_url = f'https://api.spotify.com/v1/search?q=album:{urllib.parse.quote(album_name)}%20artist:{urllib.parse.quote(artist_name)}&type=album&limit=1'
 		try:
 			album_response = requests.get(album_search_url, headers=headers)
 			album_data = album_response.json()
@@ -216,14 +215,15 @@ def update_artist_and_album_urls(conn, spotify_token):
 				time.sleep(1)
 			if 'albums' in album_data and album_data['albums']['items']:
 				album_spotify_url = album_data['albums']['items'][0]['external_urls']['spotify']
-				cursor.execute("UPDATE albums SET spotify_url=? WHERE album_id=?", (album_spotify_url, album_id))
-				print(f"Updated Spotify URL for album {artist_name} - {album_name}: {album_spotify_url}")
+				album_spotify_id = album_data['albums']['items'][0]['id']  # Extract Spotify ID
+				cursor.execute("UPDATE albums SET spotify_url=?, spotify_id=? WHERE album_id=?", (album_spotify_url, album_spotify_id, album_id))
+				print(f"Updated Spotify URL and ID for album {artist_name} - {album_name}: {album_spotify_url}, {album_spotify_id}")
 
 		except Exception as e:
 			print(f"Error fetching Spotify URL for album {artist_name} - {album_name}: {e}")
 		x += 1
 	conn.commit()
-	print("Updated artist and album URLs.")
+	print("Updated artist and album URLs and IDs.")
 
 
 def update_missing_album_data(conn, spotify_access_token):
@@ -266,6 +266,7 @@ def get_album_info(spotify_access_token, spotify_album_id):
 	else:
 		print(f"Error fetching album info from Spotify API. Status code: {response.status_code}")
 		return None, None
+
 
 # NOT USED CURRENTLY
 def url_to_uri(spotify_url):
@@ -322,37 +323,50 @@ def update_spotify_data(conn, spotify_token):
 		except Exception as e:
 			print(f"Error fetching Spotify URL for artist {artist_name}: {e}")
 		x += 1    
-	cursor.execute("SELECT album_id, artist_name, album_name, spotify_url FROM albums WHERE spotify_url IS NULL OR release_year IS NULL OR cover_art_url IS NULL")
+	cursor.execute("SELECT album_id, artist_name, album_name, spotify_url, spotify_id FROM albums WHERE spotify_url IS NULL OR release_year IS NULL OR cover_art_url IS NULL")
 	albums = cursor.fetchall()
 
-	for album_id, artist_name, album_name, album_spotify_url in albums:
-		album_search_url = f'https://api.spotify.com/v1/search?q=album:{urllib.parse.quote(str(album_name))}%20artist:{urllib.parse.quote(str(artist_name))}&type=album&limit=1'
+	for album_id, artist_name, album_name, album_spotify_url, album_spotify_id in albums:
+		if album_spotify_id is not None:
+			# Use the Spotify ID if it exists
+			album_search_url = f'https://api.spotify.com/v1/albums/{album_spotify_id}'
+		else:
+			# Otherwise, perform a search
+			album_search_url = f'https://api.spotify.com/v1/search?q=album:{urllib.parse.quote(str(album_name))}%20artist:{urllib.parse.quote(str(artist_name))}&type=album&limit=1'
+		
 		if x % 3:
-			time.sleep(2)
+			time.sleep(1)
+
 		try:
 			album_response = requests.get(album_search_url, headers=headers)
 			if album_response.status_code != 200:
-				print(f"Error fetching Spotify URL for album {album_name}: Status {album_response.status_code}, {album_response.text}")
+				print(f"Error fetching Spotify data for album {album_name}: Status {album_response.status_code}, {album_response.text}")
 				continue
 			album_data = album_response.json()
 
-
 			if 'albums' in album_data and album_data['albums']['items']:
-			    album_spotify_id = album_data['albums']['items'][0]['id']  # Fetch the Spotify ID
-			    album_spotify_url = album_data['albums']['items'][0]['external_urls']['spotify']
-			    release_year = album_data['albums']['items'][0]['release_date'][:4]  # extracting the year
-			    cover_art_url = album_data['albums']['items'][0]['images'][0]['url'] if album_data['albums']['items'][0]['images'] else None
-			    release_type = album_data['albums']['items'][0]['album_type']
-			    cursor.execute("UPDATE albums SET spotify_url = ?, release_year = ?, cover_art_url = ?, release_type = ?, spotify_id = ? WHERE album_id = ?", 
-			                   (album_spotify_url, release_year, cover_art_url, release_type, album_spotify_id, album_id))
-			    print(f"Updated Spotify URL, release year, release type, and cover art URL for album {artist_name} - {album_name}: {album_spotify_url}, {release_year}, {cover_art_url}")
+				album_info = album_data['albums']['items'][0]
+			elif 'album' in album_data:
+				album_info = album_data['album']
+			else:
+				print(f"Unable to fetch Spotify data for album {album_name}.")
+				continue
+
+			album_spotify_id = album_info['id']  # Fetch the Spotify ID
+			album_spotify_url = album_info['external_urls']['spotify']
+			release_year = album_info['release_date'][:4]  # extracting the year
+			cover_art_url = album_info['images'][0]['url'] if album_info['images'] else None
+			release_type = album_info['album_type']
+			cursor.execute("UPDATE albums SET spotify_url = ?, release_year = ?, cover_art_url = ?, release_type = ?, spotify_id = ? WHERE album_id = ?", 
+							(album_spotify_url, release_year, cover_art_url, release_type, album_spotify_id, album_id))
+			print(f"Updated Spotify URL, release year, release type, and cover art URL for album {artist_name} - {album_name}: {album_spotify_url}, {release_year}, {cover_art_url}")
 
 
 		except Exception as e:
-			print(f"Error fetching Spotify URL for album {artist_name} - {album_name}: {e}")
+			print(f"Error fetching Spotify data for album {artist_name} - {album_name}: {e}")
 		x += 1 
 	conn.commit()
-	print("Updated artist and album URLs.")
+	print("Updated album data.")
 
 def is_spotify_token_valid(access_token):
 	headers = {
@@ -368,74 +382,74 @@ def is_spotify_token_valid(access_token):
 
 # Insert new saved albums into saved_albums table
 def insert_new_saved_albums(conn, new_saved_albums):
-    print(new_saved_albums[:5])
-    cursor = conn.cursor()
+	print(new_saved_albums[:5])
+	cursor = conn.cursor()
 
-    for album in new_saved_albums:
-        artist_name, album_name = album
-        
-        # Check if the album already exists in the saved_albums table
-        cursor.execute('''SELECT COUNT(*) FROM saved_albums
-                          WHERE artist_name = ? AND album_name = ?''', (artist_name, album_name))
-        album_exists = cursor.fetchone()[0]
+	for album in new_saved_albums:
+		artist_name, album_name = album
+		
+		# Check if the album already exists in the saved_albums table
+		cursor.execute('''SELECT COUNT(*) FROM saved_albums
+						  WHERE artist_name = ? AND album_name = ?''', (artist_name, album_name))
+		album_exists = cursor.fetchone()[0]
 
-        # If the album doesn't exist, insert it into the saved_albums table
-        if not album_exists:
-            cursor.execute('''INSERT INTO saved_albums (artist_name, album_name)
-                              VALUES (?, ?)''', (artist_name, album_name))
-            print(f"Inserted new saved album: {artist_name} - {album_name}")
+		# If the album doesn't exist, insert it into the saved_albums table
+		if not album_exists:
+			cursor.execute('''INSERT INTO saved_albums (artist_name, album_name)
+							  VALUES (?, ?)''', (artist_name, album_name))
+			print(f"Inserted new saved album: {artist_name} - {album_name}")
 
-    conn.commit()
+	conn.commit()
 
 
 def update_album_durations(conn):
-    # Establish Spotify API client
-    sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=SPOTIFY_CLIENT_ID,
-                                                               client_secret=SPOTIFY_CLIENT_SECRET))
-    cursor = conn.cursor()
-    # Fetch all albums with release_length 0 or null
-    cursor.execute("SELECT album_id, spotify_id FROM albums WHERE release_length IS NULL OR release_length = 0")
-    albums = cursor.fetchall()
+	# Establish Spotify API client
+	sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=SPOTIFY_CLIENT_ID,
+															   client_secret=SPOTIFY_CLIENT_SECRET))
+	cursor = conn.cursor()
+	# Fetch all albums with release_length 0 or null
+	cursor.execute("SELECT album_id, spotify_id FROM albums WHERE release_length IS NULL OR release_length = 0")
+	albums = cursor.fetchall()
 
-    for album in albums:
-        album_id, spotify_id = album
+	for album in albums:
+		album_id, spotify_id = album
 
-        # If spotify_id is None, skip this iteration
-        if spotify_id is None:
-            print(f"Skipping album {album_id} due to missing Spotify ID")
-            continue
+		# If spotify_id is None, skip this iteration
+		if spotify_id is None:
+			print(f"Skipping album {album_id} due to missing Spotify ID")
+			continue
 
-        # Fetch the album from the Spotify API
-        try:
-            spotify_album = sp.album(spotify_id)
-        except spotipy.exceptions.SpotifyException as e:
-            print(f"Error fetching album {album_id} from Spotify: {e}")
-            continue
+		# Fetch the album from the Spotify API
+		try:
+			spotify_album = sp.album(spotify_id)
+		except spotipy.exceptions.SpotifyException as e:
+			print(f"Error fetching album {album_id} from Spotify: {e}")
+			continue
 
-        # Calculate total album duration
-        total_duration_ms = sum(track['duration_ms'] for track in spotify_album['tracks']['items'])
-        total_duration_min = math.floor(total_duration_ms / 60000)  # convert ms to min and round down
+		# Calculate total album duration
+		total_duration_ms = sum(track['duration_ms'] for track in spotify_album['tracks']['items'])
+		total_duration_min = math.floor(total_duration_ms / 60000)  # convert ms to min and round down
 
-        # Update the album's duration in the database
-        cursor.execute("UPDATE albums SET release_length = ? WHERE album_id = ?", (total_duration_min, album_id))
-    
-    # Commit the changes and close the connection
-    conn.commit()
+		# Update the album's duration in the database
+		cursor.execute("UPDATE albums SET release_length = ? WHERE album_id = ?", (total_duration_min, album_id))
+	
+	# Commit the changes and close the connection
+	conn.commit()
 
 
 def update_spotify_ids(conn):
-    cursor = conn.cursor()
-    cursor.execute("SELECT album_id, spotify_url FROM albums WHERE spotify_url IS NOT NULL AND spotify_id IS NULL")
-    rows = cursor.fetchall()
+	cursor = conn.cursor()
+	cursor.execute("SELECT album_id, spotify_url FROM albums WHERE spotify_url IS NOT NULL AND spotify_id IS NULL")
+	rows = cursor.fetchall()
 
-    for row in rows:
-        album_id = row[0]
-        spotify_url = row[1]
-        spotify_id = re.search(r'(?<=album/)[^/]*$', spotify_url).group(0)
+	for row in rows:
+		album_id = row[0]
+		spotify_url = row[1]
+		spotify_id = re.search(r'(?<=album/)[^/]*$', spotify_url).group(0)
 
-        cursor.execute("UPDATE albums SET spotify_id=? WHERE album_id=?", (spotify_id, album_id))
-        print(f"Updated Spotify ID for album {album_id}: {spotify_id}")
+		cursor.execute("UPDATE albums SET spotify_id=? WHERE album_id=?", (spotify_id, album_id))
+		print(f"Updated Spotify ID for album {album_id}: {spotify_id}")
 
-    conn.commit()
-    print("Updated Spotify IDs.")
+	conn.commit()
+	print("Updated Spotify IDs.")
 

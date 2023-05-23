@@ -9,6 +9,7 @@ from urllib.parse import quote_plus
 from requests.exceptions import ConnectTimeout
 from pylast import PyLastError
 from rymscraper import rymscraper, RymUrl
+#from rymscraper import rymscraper
 from rapidfuzz import fuzz, process 
 import selenium.common.exceptions
 from lastfm_functions import *
@@ -783,7 +784,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     for func_name in function_names:
         cursor.execute("INSERT OR IGNORE INTO executed_functions (function_name, executed) VALUES (?, 0)", (func_name,))
     conn.commit()
-    
+
     def is_spotify_token_valid(access_token):
         headers = {
         'Authorization': f'Bearer {access_token}'
@@ -837,7 +838,6 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     print(lastfm_last_update)
     #execute_if_not_done('get_new_scrobbles', fetch_lastfm_scrobbles, conn, api_key=LASTFM_API_KEY, api_secret=LASTFM_SECRET, username=LASTFM_USER, from_timestamp=lastfm_last_update)
     new_scrob = fetch_lastfm_scrobbles(conn, LASTFM_API_KEY, LASTFM_SECRET, LASTFM_USER, from_timestamp=lastfm_last_update)
-    insert_scrobbles_into_new_playlist(conn, new_scrob)
 
     execute_if_not_done("insert_scrobbles_into_new_playlist",insert_scrobbles_into_new_playlist, conn, new_scrob)
     execute_if_not_done( "populate_new_tracks_table" , populate_new_tracks_table, conn)
@@ -1420,6 +1420,7 @@ def first_time_functions(conn):
     execute_if_not_done( "delete unwanted albums", delete_unwanted_albums_and_artists, conn)
     execute_if_not_done("update_last_played", update_last_played_in_artists, conn)
     execute_if_not_done( "remove duplicate albums", remove_duplicates_albums, conn)
+    insert_initial_last_executed_date(conn)
 
 
 # ----- Misc functions ------
