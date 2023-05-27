@@ -110,7 +110,7 @@ def main(update, db_name=db_name):
         if not check_if_table_exists(conn, "albums"):
             print("First time running in this directory. Setting up the database...")
             first_time_functions(conn)
-            print("Setup complete. Run again to perform updates.")
+            print("Setup complete. Updating now.")
         else:
             conn = sqlite3.connect(db_name)
             print("Database exists. Checking if it's populated...")
@@ -602,7 +602,27 @@ def clean_album_names(conn):
     # Commit the changes to the database
     conn.commit()
 
-    print("Album names cleaned.")    
+    print("Album names cleaned.")
+
+def clean_new_album_names(conn):
+    # Create a new cursor object
+    cursor = conn.cursor()
+
+    # Fetch all the album names from the albums table
+    cursor.execute("SELECT album_id, album_name FROM new_albums")
+    albums = cursor.fetchall()
+
+    # Iterate through the albums and clean their names using remove_special_editions
+    for album in albums:
+        album_id = album[0]
+        original_album_name = album[1]
+        cleaned_album_name = remove_special_editions(original_album_name)
+
+        # Update the album name in the albums table
+        cursor.execute("UPDATE new_albums SET album_name=? WHERE album_id=?", (cleaned_album_name, album_id))
+
+    # Commit the changes to the database
+    conn.commit()
 
 # Deletes duplicate scrobbles from the playlist table based on timestamp
 def delete_duplicate_scrobbles(conn):
@@ -775,7 +795,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     function_names = ["fetch_timestamp_lastfm", "fetch_timestamp_spotify", "spotify_access_token", "save_recent_saved_albums", 
                       "parse_and_insert_saved_albums", "set_last_update_timestamp_spotify", "create_new_tracks_table",
                       "create_new_playlist_table", "create_new_albums_table", "insert_scrobbles_into_new_playlist", 
-                      "populate_new_tracks_table", "populate_new_albums_table", "update_album_track_counts", 
+                      "populate_new_tracks_table", "populate_new_albums_table", "clean_new_album_names", "update_album_track_counts", 
                       "update_album_scrobble_counts", "set_last_update_timestamp_lastfm", "append_and_update_albums", 
                       "update_albums_with_missing_ids", "update_last_played", "update_artist_and_album_urls", 
                       "delete_unwanted_albums_and_artists", "update data from spotify", "update_albums_with_lastfm_release_years", 
@@ -841,7 +861,8 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
 
     execute_if_not_done("insert_scrobbles_into_new_playlist",insert_scrobbles_into_new_playlist, conn, new_scrob)
     execute_if_not_done( "populate_new_tracks_table" , populate_new_tracks_table, conn)
-    execute_if_not_done( "populate_new_albums_table" , populate_new_albums_table, conn) 
+    execute_if_not_done( "populate_new_albums_table" , populate_new_albums_table, conn)
+    execute_if_not_done( "clean_new_album_names", clean_new_album_names, conn)
     execute_if_not_done( "update_album_track_counts" , update_album_track_counts, conn)
     execute_if_not_done( "update_album_scrobble_counts", update_album_scrobble_counts, conn)
     
