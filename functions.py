@@ -797,9 +797,9 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
                       "create_new_playlist_table", "create_new_albums_table", "insert_scrobbles_into_new_playlist", 
                       "populate_new_tracks_table", "populate_new_albums_table", "clean_new_album_names", "update_album_track_counts", 
                       "update_album_scrobble_counts", "set_last_update_timestamp_lastfm", "append_and_update_albums", 
-                      "update_albums_with_missing_ids", "update_last_played", "update_artist_and_album_urls", 
+                      "update_albums_with_missing_ids", "update_last_played", "update new artist scrobbles", "update_artist_and_album_urls", 
                       "delete_unwanted_albums_and_artists", "update data from spotify", "update_albums_with_lastfm_release_years", 
-                      "update_album_mbid", "update_release_info", "update spotify album length", "update_rym_genres", 
+                      "update_album_mbid", "update_release_info", "update spotify album length", "update_rym_genres", "update artist genres", 
                       "update_albums_with_cover_arts", "update_artists_with_images", "drop_tables"]
     for func_name in function_names:
         cursor.execute("INSERT OR IGNORE INTO executed_functions (function_name, executed) VALUES (?, 0)", (func_name,))
@@ -870,6 +870,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done( "append_and_update_albums" , append_and_update_albums, conn)
     execute_if_not_done( "update_albums_with_missing_ids" ,update_albums_with_missing_ids, conn)
     execute_if_not_done( "update_last_played",update_last_played, conn)
+    execute_if_not_done( "update new artist scrobbles", update_artist_new_scrobbles, conn)
     execute_if_not_done( "update_artist_and_album_urls" ,update_artist_and_album_urls, conn, stoken)
 
     execute_if_not_done( "delete_unwanted_albums_and_artists", delete_unwanted_albums_and_artists, conn)
@@ -879,6 +880,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done( "update_release_info" , update_release_info, conn)
     execute_if_not_done("update spotify album length", update_album_durations, conn)
     execute_if_not_done( "update_rym_genres" , update_rym_genres, conn, use_scraperapi=USE_SCRAPER)
+    execute_if_not_done( "update artist genres" , update_artist_genres, conn)
     execute_if_not_done( "update_albums_with_cover_arts" ,update_albums_with_cover_arts, conn, LASTFM_API_KEY)
     execute_if_not_done( "update_artists_with_images",update_artists_with_images, conn)
 
@@ -1078,8 +1080,8 @@ def setup_database(conn, db_name):
         artist_image TEXT,
         spotify_url TEXT,
         genre TEXT,
-        last_played INTEGER
-        -- FOREIGN KEY(artist_id) REFERENCES albums(artist_id)
+        last_played INTEGER,
+        scrobble_count INTEGER
     )
     ''')
 
@@ -1401,9 +1403,9 @@ def first_time_functions(conn):
     cursor = conn.cursor()
 
     function_names = ["setup database", "fetch scrobbles", "add latest scrobble timestamp", "clean album names in playlist",
-                      "populate tracks table", "populate albums table", "update scrobble count", "save saved albums",
+                      "populate tracks table", "populate albums table", "update scrobble count", "update artist scrobs", "save saved albums",
                       "add spotify update timestamp", "clean saved albums", "updated saved spotify albums", 
-                      "delete incomplete albums", "delete unwanted albums", "update_last_played", "remove duplicate albums"]
+                      "delete incomplete albums", "delete unwanted albums", "update_last_played", "remove duplicate albums", "insert executed date"]
     for func_name in function_names:
         cursor.execute("INSERT OR IGNORE INTO setup_functions (function_name, executed) VALUES (?, 0)", (func_name,))
     conn.commit()
@@ -1432,6 +1434,7 @@ def first_time_functions(conn):
     execute_if_not_done( "populate tracks table" , populate_tracks_table, conn)
     execute_if_not_done( "populate albums table", populate_albums_table, conn)
     execute_if_not_done( "update scrobble count", update_albums_table_scrobbles, conn)
+    execute_if_not_done( "update artist scrobs", update_artist_scrobbles, conn)
     token = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
     execute_if_not_done( "save saved albums", save_spotify_saved_albums_to_db, conn, token)
     execute_if_not_done( "add spotify update timestamp", add_current_timestamp_to_updates, conn)
@@ -1441,7 +1444,7 @@ def first_time_functions(conn):
     execute_if_not_done( "delete unwanted albums", delete_unwanted_albums_and_artists, conn)
     execute_if_not_done("update_last_played", update_last_played_in_artists, conn)
     execute_if_not_done( "remove duplicate albums", remove_duplicates_albums, conn)
-    insert_initial_last_executed_date(conn)
+    execute_if_not_done( "insert executed date", insert_initial_last_executed_date, conn)
 
 
 # ----- Misc functions ------
@@ -1560,13 +1563,100 @@ def get_with_retry(url, headers, max_retries=3):
             retries += 1
     return None
 
+def update_database_from_csv(conn, csv_path: str):
+
+    cursor = conn.cursor()
+
+    df = pd.read_csv(csv_path)
+
+    for idx, row in df.iterrows():
+        cursor.execute("""
+            UPDATE albums
+            SET
+                release_year = COALESCE(release_year, ?),
+                genre = COALESCE(genre, ?),
+                release_type = COALESCE(release_type, ?),
+                cover_art_url = COALESCE(cover_art_url, ?),
+                spotify_url = COALESCE(spotify_url, ?),
+                mbid = COALESCE(mbid, ?),
+                country = COALESCE(country, ?),
+                release_length = COALESCE(release_length, ?),
+                spotify_id = COALESCE(spotify_id, ?)
+            WHERE album_name = ? AND artist_name = ?
+        """, (row['release_year'], row['genre'], row['release_type'], row['cover_art_url'], row['spotify_url'], row['mbid'], row['country'], row['release_length'], row['spotify_id'], row['album_name'], row['artist_name']))
+
+    conn.commit()
+    # conn.close()
 
 
+def update_artist_genres(conn):
+
+    cursor= conn.cursor()
+
+    # Fetch album genres and associated artists
+    cursor.execute("SELECT artist_name, genre FROM albums WHERE genre IS NOT NULL")
+    album_genres = cursor.fetchall()
+
+    for artist, album_genre in album_genres:
+        # Fetch the existing genres for this artist
+        cursor.execute("SELECT genre FROM artists WHERE artist_name = ?", (artist,))
+        existing_genre =  cursor.fetchone()
+
+        if existing_genre is not None:
+            existing_genre = existing_genre[0]
+
+        # If the artist has no genres yet, add the album's genre directly
+        if existing_genre is None or existing_genre == '':
+            cursor.execute("UPDATE artists SET genre = ? WHERE artist_name = ?", (album_genre, artist))
+        else:
+            # If the artist already has genres, append the album's genre if it's not already there
+            existing_genres = set(existing_genre.split(","))
+            album_genres = set(album_genre.split(","))
+            merged_genres = existing_genres.union(album_genres)
+            merged_genre_string = ",".join(merged_genres)
+            cursor.execute("UPDATE artists SET genre = ? WHERE artist_name = ?", (merged_genre_string, artist))
+
+    conn.commit()
+    # conn.close()
 
 
+def update_artist_scrobbles(conn):
+    # Connect to the SQLite database
+    cursor = conn.cursor()
+
+    # Fetch all artist names
+    cursor.execute("SELECT artist_name FROM artists")
+    artist_names = cursor.fetchall()
+
+    for artist in artist_names:
+        # Fetch scrobble counts of all albums related to this artist
+        cursor.execute("SELECT SUM(scrobble_count) FROM albums WHERE artist_name = ?", (artist[0],))
+        scrobble_count = cursor.fetchone()
+
+        if scrobble_count[0] is not None:
+            # Update scrobble count in artists table
+            cursor.execute("UPDATE artists SET scrobble_count = ? WHERE artist_name = ?", (scrobble_count[0], artist[0]))
+
+    conn.commit()
 
 
+def update_artist_new_scrobbles(conn):
+    # Connect to the SQLite database
+    cursor = conn.cursor()
 
+    # Fetch all artist names
+    cursor.execute("SELECT DISTINCT artist_name FROM new_albums")
+    artist_names = cursor.fetchall()
 
+    for artist in artist_names:
+        # Fetch scrobble counts of all albums related to this artist
+        cursor.execute("SELECT SUM(scrobble_count) FROM albums WHERE artist_name = ?", (artist[0],))
+        scrobble_count = cursor.fetchone()
+
+        if scrobble_count[0] is not None:
+            # Update scrobble count in artists table
+            cursor.execute("UPDATE artists SET scrobble_count = ? WHERE artist_name = ?", (scrobble_count[0], artist[0]))
+
+    conn.commit()
 
 
