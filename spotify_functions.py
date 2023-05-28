@@ -175,56 +175,85 @@ def search_spotify(query, query_type, spotify_token, max_retries=3, delay=2):
 	return None
 
 def update_artist_and_album_urls(conn, spotify_token):
-	""" Updates artist and album Spotify URLs in the database"""
-	cursor = conn.cursor()
-	cursor.execute("SELECT artist_id, artist_name, spotify_url FROM artists WHERE spotify_url IS NULL")
-	artists = cursor.fetchall()
+    """ Updates artist and album Spotify URLs in the database"""
+    cursor = conn.cursor()
+    cursor.execute("SELECT artist_id, artist_name, spotify_url FROM artists WHERE spotify_url IS NULL")
+    artists = cursor.fetchall()
 
-	headers = {
-		'Authorization': f'Bearer {spotify_token}'
-	}
+    headers = {
+        'Authorization': f'Bearer {spotify_token}'
+    }
 
-	x = 0
-	for artist_id, artist_name, artist_spotify_url in artists:
-		artist_search_url = f'https://api.spotify.com/v1/search?q={urllib.parse.quote(artist_name)}&type=artist&limit=1'
-		try:
-			artist_response = requests.get(artist_search_url, headers=headers)
-			artist_data = artist_response.json()
+    x = 0
+    missing_artists = []
+    missing_albums = []
 
-			if x % 10:
-				time.sleep(1)
-			if 'artists' in artist_data and artist_data['artists']['items']:
-				artist_spotify_url = artist_data['artists']['items'][0]['external_urls']['spotify']
-				cursor.execute("UPDATE artists SET spotify_url=? WHERE artist_id=?", (artist_spotify_url, artist_id))
-				print(f"Updated Spotify URL for artist {artist_name}: {artist_spotify_url}")
+    try:
+        with open('missing_artists.txt', 'r') as file:
+            missing_artists = file.read().splitlines()
+    except:
+        pass
 
-		except Exception as e:
-			print(f"Error fetching Spotify URL for artist {artist_name}: {e}")
-		x += 1
-	cursor.execute("SELECT album_id, artist_name, album_name, spotify_url FROM albums WHERE spotify_url IS NULL")
-	albums = cursor.fetchall()
+    try:
+        with open('missing_albums.txt', 'r') as file:
+            missing_albums = file.read().splitlines()
+    except:
+        pass
 
-	for album_id, artist_name, album_name, album_spotify_url in albums:
-		album_search_url = f'https://api.spotify.com/v1/search?q=album:{urllib.parse.quote(str(album_name))}%20artist:{urllib.parse.quote(str(artist_name))}&type=album&limit=1'
+    for artist_id, artist_name, artist_spotify_url in artists:
+        if artist_name in missing_artists:
+            continue
+        artist_search_url = f'https://api.spotify.com/v1/search?q={urllib.parse.quote(artist_name)}&type=artist&limit=1'
+        try:
+            artist_response = requests.get(artist_search_url, headers=headers)
+            artist_data = artist_response.json()
 
-		try:
-			album_response = requests.get(album_search_url, headers=headers)
-			album_data = album_response.json()
+            if x % 10:
+                time.sleep(1)
+            if 'artists' in artist_data and artist_data['artists']['items']:
+                artist_spotify_url = artist_data['artists']['items'][0]['external_urls']['spotify']
+                cursor.execute("UPDATE artists SET spotify_url=? WHERE artist_id=?", (artist_spotify_url, artist_id))
+                print(f"Updated Spotify URL for artist {artist_name}: {artist_spotify_url}")
 
-			if x % 10:
-				time.sleep(1)
-			if 'albums' in album_data and album_data['albums']['items']:
-				album_spotify_url = album_data['albums']['items'][0]['external_urls']['spotify']
-				album_spotify_id = album_data['albums']['items'][0]['id']  # Extract Spotify ID
-				cursor.execute("UPDATE albums SET spotify_url=?, spotify_id=? WHERE album_id=?", (album_spotify_url, album_spotify_id, album_id))
-				print(f"Updated Spotify URL and ID for album {artist_name} - {album_name}: {album_spotify_url}, {album_spotify_id}")
+        except Exception as e:
+            print(f"Error fetching Spotify URL for artist {artist_name}: {e}")
+            missing_artists.append(artist_name)
+        x += 1
+    with open('missing_artists.txt', 'w') as file:
+        for artist in missing_artists:
+            file.write(f"{artist}\n")
 
-		except Exception as e:
-			print(f"Error fetching Spotify URL for album {artist_name} - {album_name}: {e}")
-		x += 1
-	conn.commit()
-	print("Updated artist and album URLs and IDs.")
+    cursor.execute("SELECT album_id, artist_name, album_name, spotify_url FROM albums WHERE spotify_url IS NULL")
+    albums = cursor.fetchall()
 
+    for album_id, artist_name, album_name, album_spotify_url in albums:
+        if album_name in missing_albums:
+            continue
+        album_search_url = f'https://api.spotify.com/v1/search?q=album:{urllib.parse.quote(str(album_name))}%20artist:{urllib.parse.quote(str(artist_name))}&type=album&limit=1'
+
+        try:
+            album_response = requests.get(album_search_url, headers=headers)
+            album_data = album_response.json()
+
+            if x % 10:
+                time.sleep(1)
+            if 'albums' in album_data and album_data['albums']['items']:
+                album_spotify_url = album_data['albums']['items'][0]['external_urls']['spotify']
+                album_spotify_id = album_data['albums']['items'][0]['id']  # Extract Spotify ID
+                cursor.execute("UPDATE albums SET spotify_url=?, spotify_id=? WHERE album_id=?", (album_spotify_url, album_spotify_id, album_id))
+                print(f"Updated Spotify URL and ID for album {artist_name} - {album_name}: {album_spotify_url}, {album_spotify_id}")
+
+        except Exception as e:
+            print(f"Error fetching Spotify URL for album {artist_name} - {album_name}: {e}")
+            missing_albums.append(album_name)
+        x += 1
+
+    with open('missing_albums.txt', 'w') as file:
+        for album in missing_albums:
+            file.write(f"{album}\n")
+
+    conn.commit()
+    print("Updated artist and album URLs and IDs.")
 
 def update_missing_album_data(conn, spotify_access_token):
 	""" Updates missing album data (release year, cover art) from Spotify API """
@@ -379,9 +408,8 @@ def is_spotify_token_valid(access_token):
 	else:
 		return print('False')
 
-
-# Insert new saved albums into saved_albums table
 def insert_new_saved_albums(conn, new_saved_albums):
+	""" Insert new saved albums into saved_albums table """
 	print(new_saved_albums[:5])
 	cursor = conn.cursor()
 
@@ -400,7 +428,6 @@ def insert_new_saved_albums(conn, new_saved_albums):
 			print(f"Inserted new saved album: {artist_name} - {album_name}")
 
 	conn.commit()
-
 
 def update_album_durations(conn):
 	# Establish Spotify API client
@@ -435,7 +462,6 @@ def update_album_durations(conn):
 	
 	# Commit the changes and close the connection
 	conn.commit()
-
 
 def update_spotify_ids(conn):
 	cursor = conn.cursor()
