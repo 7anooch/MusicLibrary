@@ -2,8 +2,6 @@ I hate the fact that spotify won't let you filter by genre, so I made a little t
 
 ![image](https://github.com/7anooch/MusicLibrary/assets/129010989/4306824f-9e66-4c95-a706-8cee3ccfd5b0)
 
-Needs https://github.com/dbeley/rymscraper or my fork https://github.com/7anooch/rymscraper which is slower but has a better chance of finding albums (and their genres).
-
 You will also need lastfm and spotify API keys, add them to the keys.json (and get rid of the '\_template' part). When setting up your spotify API key, make sure you set redirect uri to `http://localhost:8080/callback`.
 
 A scraperAPI key is optional, but will help a good deal for getting RYM genres. You'll get 5000 free API calls with a new account (which should be enough for most people) and then 1000 API calls a month after that. If using scraperAPI just set your API key in keys.json and set `"use": "yes"`, otherwise it'll use rymscraper which is rather slow to avoid rate limiting from RYM.
