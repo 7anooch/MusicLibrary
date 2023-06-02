@@ -32,7 +32,7 @@ else:
 
 # discogs_client.user_agent = "MusicLibrary/0.1"  # Replace with your app name and version
 d = discogs_client.Client("MusicLibrary/0.1", user_token=config['discogs']['token'])
-musicbrainzngs.set_useragent("YourAppName", "0.1", "7anooch@gmail.com")
+musicbrainzngs.set_useragent("MusicLibrary", "0.1", "youremail@gmail.com")
 
 
 # db_path = "lastfm_dump.db"  # Replace with the path to your SQLite database file
@@ -58,6 +58,8 @@ cursor = conn.cursor()
 # update_release_info(conn)
 # update_spotify_ids(conn)
 # update_album_durations(conn)
+
+# insert_initial_last_executed_date(conn)
 
 #reset_executed_functions(conn)
 # update_albums_with_release_years(conn)
@@ -100,5 +102,6 @@ if __name__ == "__main__":
     table_name = 'artists'
     num_entries = count_entries_in_table(table_name)
     print(f"The {table_name} table has {num_entries} entries.")
-    
+
+conn.close() 
 

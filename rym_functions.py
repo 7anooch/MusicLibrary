@@ -85,37 +85,44 @@ def get_genres_from_rym(rym_url, use_scraperapi=True):
 	return ", ".join(genres) if genres else False
 
 def get_rym_genres(artist_name, album_name, network, retry_attempts=3, retry_delay=5):
-    """ Gets genres for an album from RateYourMusic"""
-    search_query = f"{artist_name} - {album_name}"
+	""" Gets genres for an album from RateYourMusic"""
+	search_query = f"{artist_name} - {album_name}"
+	if not artist_name or not album_name:
+		print(f"Invalid input: artist_name='{artist_name}', album_name='{album_name}'")
+		return None 
 
-    for attempt in range(retry_attempts):
-        try:
-            album_infos = network.get_album_infos(name=search_query)
+	for attempt in range(retry_attempts):
+		try:
+			album_infos = network.get_album_infos(name=search_query)
+			if album_infos is None:
+				print(f"Failed to get album infos for {artist_name} - {album_name}. Skipping...")
+				return None
 
-            if "Genres" in album_infos:
-                genres = album_infos["Genres"]
-                genres = genres.replace('\n', ', ')  # Replace line breaks with a comma and space
-                return genres
-            else:
-                print(f"No 'Genres' found in album info for {artist_name} - {album_name}")
-                return None
 
-        except AttributeError as e:
-            print(f"AttributeError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
-            return None
-        except IndexError as e:
-            print(f"IndexError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
-            return None
-        except TypeError as e:
-            print(f"TypeError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
-            return None
-        except selenium.common.exceptions.WebDriverException as e:
-            if attempt < retry_attempts - 1:
-                print(f"Attempt {attempt+1} of {retry_attempts} failed with WebDriverException: {e}. Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-            else:
-                print(f"All attempts failed for {artist_name} - {album_name}. Please check your network connection and ensure rateyourmusic.com is online.")
-                return None
+			if "Genres" in album_infos:
+				genres = album_infos["Genres"]
+				genres = genres.replace('\n', ', ')  # Replace line breaks with a comma and space
+				return genres
+			else:
+				print(f"No 'Genres' found in album info for {artist_name} - {album_name}")
+				return None
+
+		except AttributeError as e:
+			print(f"AttributeError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
+			return None
+		except IndexError as e:
+			print(f"IndexError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
+			return None
+		except TypeError as e:
+			print(f"TypeError occurred while fetching RYM genres for {artist_name} - {album_name}: {e}")
+			return None
+		except selenium.common.exceptions.WebDriverException as e:
+			if attempt < retry_attempts - 1:
+				print(f"Attempt {attempt+1} of {retry_attempts} failed with WebDriverException: {e}. Retrying in {retry_delay} seconds...")
+				time.sleep(retry_delay)
+			else:
+				print(f"All attempts failed for {artist_name} - {album_name}. Please check your network connection and ensure rateyourmusic.com is online.")
+				return None
 
 
 # NOT CURRENTLY USED
@@ -146,7 +153,7 @@ def update_rym_genres(conn, use_scraperapi=False):
 
 	skipped_albums_file = "skipped_albums.txt"
 	skipped_albums = load_skipped_albums_list(skipped_albums_file)
-	cursor.execute("SELECT album_name, artist_name, release_type, album_id, num_tracks FROM albums WHERE genre IS NULL")
+	cursor.execute("SELECT album_name, artist_name, release_type, album_id, num_tracks FROM albums WHERE genre IS NULL OR genre = '' ")
 	albums = cursor.fetchall()
 	network = rymscraper.RymNetwork(headless=True)
 
@@ -254,37 +261,37 @@ def clean_for_rym_url(text):
 
 
 def load_skipped_albums_list(file_name):
-    if not os.path.isfile(file_name):
-        return set()
+	if not os.path.isfile(file_name):
+		return set()
 
-    skipped_albums = set()
-    try:
-        with open(file_name, "r") as f:
-            for line in f:
-                parts = line.strip().split(" - ", 1)  # only split on the first dash
-                if len(parts) == 2:
-                    skipped_albums.add(tuple(parts))
-                else:
-                    print(f"Invalid entry in skipped_albums file: {line.strip()}")
-    except FileNotFoundError:
-        pass
-    
-    return skipped_albums
+	skipped_albums = set()
+	try:
+		with open(file_name, "r") as f:
+			for line in f:
+				parts = line.strip().split(" - ", 1)  # only split on the first dash
+				if len(parts) == 2:
+					skipped_albums.add(tuple(parts))
+				else:
+					print(f"Invalid entry in skipped_albums file: {line.strip()}")
+	except FileNotFoundError:
+		pass
+	
+	return skipped_albums
 
 # Saves a list of skipped albums to a file
 def save_skipped_albums_list(skipped_albums_file, skipped_albums):
-    with open(skipped_albums_file, "w") as f:
-        for artist_name, album_name in skipped_albums:
-            f.write(f"{artist_name} - {album_name}\n")
+	with open(skipped_albums_file, "w") as f:
+		for artist_name, album_name in skipped_albums:
+			f.write(f"{artist_name} - {album_name}\n")
 
 
 
 def remove_special_editions(album_name):
-    if album_name is None:
-        return ""
+	if album_name is None:
+		return ""
 
-    words = ['edition', 'anniversary', 'bonus', 'reissue', 'issue', 'deluxe', 'remaster', 'remastered', 'version']
-    pattern = r'(\[.*(' + '|'.join(words) + ').*\]|\(.*(' + '|'.join(words) + ').*\)|\{.*(' + '|'.join(words) + ').*\})'
-    modified_album_name = re.sub(pattern, '', album_name, flags=re.IGNORECASE)
+	words = ['edition', 'anniversary', 'bonus', 'reissue', 'issue', 'deluxe', 'remaster', 'remastered', 'version']
+	pattern = r'(\[.*(' + '|'.join(words) + ').*\]|\(.*(' + '|'.join(words) + ').*\)|\{.*(' + '|'.join(words) + ').*\})'
+	modified_album_name = re.sub(pattern, '', album_name, flags=re.IGNORECASE)
 
-    return modified_album_name.strip()
+	return modified_album_name.strip()

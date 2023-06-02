@@ -190,8 +190,6 @@ def fetch_lastfm_scrobbles(conn, api_key, api_secret, username, from_timestamp=N
             print(f"Scrobble {scrobble_count}: {scrobble}")
 
         print(f"Fetched {len(scrobbles)} scrobbles")
-        # store_intermediate_result(conn, "recent_scrobbles", scrobbles)
-        print("Scrobbles fetched and stored successfully")
         return scrobbles
 
     except PyLastError as e:
