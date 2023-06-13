@@ -15,6 +15,7 @@ LASTFM_SECRET = config['lastfm']['secret']
 LASTFM_USER = config['lastfm']['user']
 db_name = config['database']['name']
 
+
 def update_albums_with_cover_arts(conn, api_key):
     """ Update album cover art using the Last.fm API """
     cursor = conn.cursor()
@@ -23,19 +24,30 @@ def update_albums_with_cover_arts(conn, api_key):
 
     missing_cover_arts = []
 
+    try:
+        with open('missing_cover_arts.txt', 'r') as file:
+            missing_cover_arts = file.read().splitlines()
+    except:
+        pass
+
     for album_id, artist_name, album_name in albums:
+        full_album_name = f"{artist_name} - {album_name}"
+        if full_album_name in missing_cover_arts:
+            continue
         cover_art_url = get_lastfm_cover_art_url(api_key, artist_name, album_name)
         if cover_art_url:
             cursor.execute("UPDATE albums SET cover_art_url=? WHERE album_id=?", (cover_art_url, album_id))
             print(f"Updated cover art for {album_name}: {cover_art_url}")
         else:
             print(f"No cover art found for {album_name}")
-            missing_cover_arts.append(f"{artist_name} - {album_name}")
+            missing_cover_arts.append(full_album_name)
 
-    with open("missing_cover_arts.txt", "w") as file:
-        file.write("\n".join(missing_cover_arts))
+    with open('missing_cover_arts.txt', 'w') as file:
+        for album in missing_cover_arts:
+            file.write(f"{album}\n")
 
     conn.commit()
+
 
 def get_lastfm_cover_art_url(api_key, artist_name, album_name):
     """ Fetches the album cover art URL from the Last.fm API for a given artist and album."""
@@ -218,7 +230,17 @@ def update_albums_with_lastfm_release_years(conn, lastfm_api_key):
 
     missing_release_years = []
 
+    try:
+        with open("missing_release_years.txt", "r") as file:
+            missing_release_years = file.read().splitlines()
+    except:
+        pass
+
     for album_id, artist_name, album_name in albums:
+        full_album_name = f"{artist_name} - {album_name}"
+        if full_album_name in missing_release_years:
+            continue
+            
         release_year = get_lastfm_release_year(artist_name, album_name, lastfm_api_key)
         if release_year:
             cursor.execute("UPDATE albums SET release_year=? WHERE album_id=?", (release_year, album_id))
@@ -228,9 +250,11 @@ def update_albums_with_lastfm_release_years(conn, lastfm_api_key):
             missing_release_years.append(f"{artist_name} - {album_name}")
 
     with open("missing_release_years.txt", "w") as file:
-        file.write("\n".join(missing_release_years))
+        for album in missing_release_years:
+            file.write(f"{album}\n")
 
     conn.commit()
+
 
 # check
 def fetch_scrobbles_and_save_to_db(conn):

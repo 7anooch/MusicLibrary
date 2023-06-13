@@ -255,6 +255,7 @@ def update_artist_and_album_urls(conn, spotify_token):
     conn.commit()
     print("Updated artist and album URLs and IDs.")
 
+
 def update_missing_album_data(conn, spotify_access_token):
 	""" Updates missing album data (release year, cover art) from Spotify API """
 	cursor = conn.cursor() # Get albums with missing release year or cover art
@@ -324,78 +325,109 @@ def parse_and_insert_saved_albums(conn):
 	insert_new_saved_albums(conn, new_saved_albums)
 
 def update_spotify_data(conn, spotify_token):
-	cursor = conn.cursor()
-	headers = {
-		'Authorization': f'Bearer {spotify_token}'
-	}
+    cursor = conn.cursor()
+    headers = {
+        'Authorization': f'Bearer {spotify_token}'
+    }
 
-	# Update artist and album URLs
-	cursor.execute("SELECT artist_id, artist_name, spotify_url FROM artists WHERE spotify_url IS NULL")
-	artists = cursor.fetchall()
+    x = 0
+    missing_artists = []
+    missing_albums = []
 
-	x = 0
-	for artist_id, artist_name, artist_spotify_url in artists:
-		artist_search_url = f'https://api.spotify.com/v1/search?q={urllib.parse.quote(artist_name)}&type=artist&limit=1'
-		if x % 4:
-			time.sleep(2)
-		try:
-			artist_response = requests.get(artist_search_url, headers=headers)
-			if artist_response.status_code != 200:
-				print(f"Error fetching Spotify URL for artist {artist_name}: Status {artist_response.status_code}, {artist_response.text}")
-				continue
-			artist_data = artist_response.json()
+    try:
+        with open('missing_artists_spotify_data.txt', 'r') as file:
+            missing_artists = file.read().splitlines()
+    except:
+        pass
 
-			if 'artists' in artist_data and artist_data['artists']['items']:
-				artist_spotify_url = artist_data['artists']['items'][0]['external_urls']['spotify']
-				cursor.execute("UPDATE artists SET spotify_url=? WHERE artist_id=?", (artist_spotify_url, artist_id))
-				print(f"Updated Spotify URL for artist {artist_name}: {artist_spotify_url}")
-		except Exception as e:
-			print(f"Error fetching Spotify URL for artist {artist_name}: {e}")
-		x += 1    
-	cursor.execute("SELECT album_id, artist_name, album_name, spotify_url, spotify_id FROM albums WHERE spotify_url IS NULL OR release_year IS NULL OR cover_art_url IS NULL")
-	albums = cursor.fetchall()
+    try:
+        with open('missing_albums_spotify_data.txt', 'r') as file:
+            missing_albums = file.read().splitlines()
+    except:
+        pass
 
-	for album_id, artist_name, album_name, album_spotify_url, album_spotify_id in albums:
-		if album_spotify_id is not None:
-			# Use the Spotify ID if it exists
-			album_search_url = f'https://api.spotify.com/v1/albums/{album_spotify_id}'
-		else:
-			# Otherwise, perform a search
-			album_search_url = f'https://api.spotify.com/v1/search?q=album:{urllib.parse.quote(str(album_name))}%20artist:{urllib.parse.quote(str(artist_name))}&type=album&limit=1'
-		
-		if x % 3:
-			time.sleep(1)
+    cursor.execute("SELECT artist_id, artist_name, spotify_url FROM artists WHERE spotify_url IS NULL")
+    artists = cursor.fetchall()
 
-		try:
-			album_response = requests.get(album_search_url, headers=headers)
-			if album_response.status_code != 200:
-				print(f"Error fetching Spotify data for album {album_name}: Status {album_response.status_code}, {album_response.text}")
-				continue
-			album_data = album_response.json()
+    for artist_id, artist_name, artist_spotify_url in artists:
+        if artist_name in missing_artists:
+            continue
+        artist_search_url = f'https://api.spotify.com/v1/search?q={urllib.parse.quote(artist_name)}&type=artist&limit=1'
+        if x % 4:
+            time.sleep(2)
+        try:
+            artist_response = requests.get(artist_search_url, headers=headers)
+            if artist_response.status_code != 200:
+                print(f"Error fetching Spotify URL for artist {artist_name}: Status {artist_response.status_code}, {artist_response.text}")
+                missing_artists.append(artist_name)
+                continue
+            artist_data = artist_response.json()
 
-			if 'albums' in album_data and album_data['albums']['items']:
-				album_info = album_data['albums']['items'][0]
-			elif 'album' in album_data:
-				album_info = album_data['album']
-			else:
-				print(f"Unable to fetch Spotify data for album {album_name}.")
-				continue
+            if 'artists' in artist_data and artist_data['artists']['items']:
+                artist_spotify_url = artist_data['artists']['items'][0]['external_urls']['spotify']
+                cursor.execute("UPDATE artists SET spotify_url=? WHERE artist_id=?", (artist_spotify_url, artist_id))
+                print(f"Updated Spotify URL for artist {artist_name}: {artist_spotify_url}")
+        except Exception as e:
+            print(f"Error fetching Spotify URL for artist {artist_name}: {e}")
+            missing_artists.append(artist_name)
+        x += 1    
 
-			album_spotify_id = album_info['id']  # Fetch the Spotify ID
-			album_spotify_url = album_info['external_urls']['spotify']
-			release_year = album_info['release_date'][:4]  # extracting the year
-			cover_art_url = album_info['images'][0]['url'] if album_info['images'] else None
-			release_type = album_info['album_type']
-			cursor.execute("UPDATE albums SET spotify_url = ?, release_year = ?, cover_art_url = ?, release_type = ?, spotify_id = ? WHERE album_id = ?", 
-							(album_spotify_url, release_year, cover_art_url, release_type, album_spotify_id, album_id))
-			print(f"Updated Spotify URL, release year, release type, and cover art URL for album {artist_name} - {album_name}: {album_spotify_url}, {release_year}, {cover_art_url}")
+    with open('missing_artists_spotify_data.txt', 'w') as file:
+        for artist in missing_artists:
+            file.write(f"{artist}\n")
+
+    cursor.execute("SELECT album_id, artist_name, album_name, spotify_url, spotify_id FROM albums WHERE spotify_url IS NULL OR release_year IS NULL OR cover_art_url IS NULL")
+    albums = cursor.fetchall()
+
+    for album_id, artist_name, album_name, album_spotify_url, album_spotify_id in albums:
+        if album_name in missing_albums:
+            continue
+        if album_spotify_id is not None:
+            album_search_url = f'https://api.spotify.com/v1/albums/{album_spotify_id}'
+        else:
+            album_search_url = f'https://api.spotify.com/v1/search?q=album:{urllib.parse.quote(str(album_name))}%20artist:{urllib.parse.quote(str(artist_name))}&type=album&limit=1'
+        
+        if x % 3:
+            time.sleep(1)
+        try:
+            album_response = requests.get(album_search_url, headers=headers)
+            if album_response.status_code != 200:
+                print(f"Error fetching Spotify data for album {album_name}: Status {album_response.status_code}, {album_response.text}")
+                missing_albums.append(album_name)
+                continue
+            album_data = album_response.json()
+
+            if 'albums' in album_data and album_data['albums']['items']:
+                album_info = album_data['albums']['items'][0]
+            elif 'album' in album_data:
+                album_info = album_data['album']
+            else:
+                print(f"Unable to fetch Spotify data for album {album_name}.")
+                missing_albums.append(album_name)
+                continue
+
+            album_spotify_id = album_info['id']
+            album_spotify_url = album_info['external_urls']['spotify']
+            release_year = album_info['release_date'][:4]
+            cover_art_url = album_info['images'][0]['url'] if album_info['images'] else None
+            release_type = album_info['album_type']
+            cursor.execute("UPDATE albums SET spotify_url = ?, release_year = ?, cover_art_url = ?, release_type = ?, spotify_id = ? WHERE album_id = ?", 
+                            (album_spotify_url, release_year, cover_art_url, release_type, album_spotify_id, album_id))
+            print(f"Updated Spotify URL, release year, release type, and cover art URL for album {artist_name} - {album_name}: {album_spotify_url}, {release_year}, {cover_art_url}")
 
 
-		except Exception as e:
-			print(f"Error fetching Spotify data for album {artist_name} - {album_name}: {e}")
-		x += 1 
-	conn.commit()
-	print("Updated album data.")
+        except Exception as e:
+            print(f"Error fetching Spotify data for album {artist_name} - {album_name}: {e}")
+            missing_albums.append(album_name)
+        x += 1 
+
+    with open('missing_albums_spotify_data.txt', 'w') as file:
+        for album in missing_albums:
+            file.write(f"{album}\n")
+
+    conn.commit()
+    print("Updated album data.")
+
 
 def is_spotify_token_valid(access_token):
 	headers = {
