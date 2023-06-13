@@ -857,7 +857,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done("create_new_albums_table",create_new_albums_table, conn)
     print(lastfm_last_update)
     #execute_if_not_done('get_new_scrobbles', fetch_lastfm_scrobbles, conn, api_key=LASTFM_API_KEY, api_secret=LASTFM_SECRET, username=LASTFM_USER, from_timestamp=lastfm_last_update)
-    new_scrob = fetch_lastfm_scrobbles(conn, LASTFM_API_KEY, LASTFM_SECRET, LASTFM_USER, from_timestamp=lastfm_last_update)
+    new_scrob, lastfm_ts = fetch_lastfm_scrobbles(conn, LASTFM_API_KEY, LASTFM_SECRET, LASTFM_USER, from_timestamp=lastfm_last_update)
 
     execute_if_not_done("insert_scrobbles_into_new_playlist",insert_scrobbles_into_new_playlist, conn, new_scrob)
     execute_if_not_done( "populate_new_tracks_table" , populate_new_tracks_table, conn)
@@ -866,7 +866,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done( "update_album_track_counts" , update_album_track_counts, conn)
     execute_if_not_done( "update_album_scrobble_counts", update_album_scrobble_counts, conn)
     
-    execute_if_not_done( "set_last_update_timestamp_lastfm" ,set_last_update_timestamp, conn, "lastfm", int(time.time()))
+    execute_if_not_done( "set_last_update_timestamp_lastfm" ,set_last_update_timestamp, conn, "lastfm", lastfm_ts)
     execute_if_not_done( "append_and_update_albums" , append_and_update_albums, conn)
     execute_if_not_done( "update_albums_with_missing_ids" ,update_albums_with_missing_ids, conn)
     execute_if_not_done( "update_last_played",update_last_played, conn)

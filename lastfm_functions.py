@@ -201,11 +201,30 @@ def fetch_lastfm_scrobbles(conn, api_key, api_secret, username, from_timestamp=N
             scrobble_count += 1
             print(f"Scrobble {scrobble_count}: {scrobble}")
 
+        # remove scrobbles from the first album
+        scrobbles = remove_first_album(scrobbles)
+
         print(f"Fetched {len(scrobbles)} scrobbles")
-        return scrobbles
+
+        if scrobbles:
+            latest_scrobble_timestamp = scrobbles[0]['date']
+        else:
+            print("No scrobbles available after removing the first album.")
+
+        return scrobbles, latest_scrobble_timestamp
 
     except PyLastError as e:
         print(f"An error occurred while fetching Last.fm scrobbles: {e}")
+
+
+def remove_first_album(scrobbles):
+    """Removes all scrobbles from the first album in a list of scrobbles"""
+    if len(scrobbles) < 1:
+        return scrobbles
+
+    first_album = scrobbles[0]['album_name']
+    return [scrobble for scrobble in scrobbles if scrobble['album_name'] != first_album]
+
 
 def get_lastfm_release_year(artist_name, album_name, api_key):
     """ Retrieves release year for an album from Last.fm"""
@@ -240,7 +259,7 @@ def update_albums_with_lastfm_release_years(conn, lastfm_api_key):
         full_album_name = f"{artist_name} - {album_name}"
         if full_album_name in missing_release_years:
             continue
-            
+
         release_year = get_lastfm_release_year(artist_name, album_name, lastfm_api_key)
         if release_year:
             cursor.execute("UPDATE albums SET release_year=? WHERE album_id=?", (release_year, album_id))
@@ -250,7 +269,7 @@ def update_albums_with_lastfm_release_years(conn, lastfm_api_key):
             missing_release_years.append(f"{artist_name} - {album_name}")
 
     with open("missing_release_years.txt", "w") as file:
-        for album in missing_release_years:
+        for album in missing_release_years: 
             file.write(f"{album}\n")
 
     conn.commit()
