@@ -1,5 +1,5 @@
 import requests, spotipy, base64, webbrowser, json, sqlite3, schedule, time, pylast, re, random, argparse
-import musicbrainzngs, discogs_client, requests.exceptions, urllib.parse, unicodedata, datetime, os
+import musicbrainzngs, discogs_client, requests.exceptions, urllib.parse, unicodedata, datetime, os, csv
 import pandas as pd
 import matplotlib.pyplot as plt
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -100,8 +100,9 @@ def check_if_table_exists(conn, table_name):
     cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")
     return cursor.fetchone() is not None
 
+
 # Main function that connects to the database, updates data, and closes the connection
-def main(update, db_name=db_name):
+def main(update, import_csv, db_name=db_name):
     conn = sqlite3.connect(db_name)
     conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
 
@@ -110,6 +111,8 @@ def main(update, db_name=db_name):
         if not check_if_table_exists(conn, "albums"):
             print("First time running in this directory. Setting up the database...")
             first_time_functions(conn)
+            if import_csv:
+                update_database_from_csv(conn, 'album_data.csv')
             print("Setup complete. Updating now.")
         else:
             conn = sqlite3.connect(db_name)
@@ -121,22 +124,30 @@ def main(update, db_name=db_name):
                     check_if_populated(conn, "artists") and 
                     check_if_populated(conn, "saved_albums")):
                     print("Database is populated. Running other functions...")
+                    if import_csv:
+                        update_database_from_csv(conn, 'album_data.csv')
                     update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
                     set_last_executed_date(conn, datetime.datetime.now())
                 else:
                     print("Database is not fully populated. Setting up the database...")
                     first_time_functions(conn)
                     print("Setup complete. Updating now.")
+                    if import_csv:
+                        update_database_from_csv(conn, 'album_data.csv')
                     update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
             else:
                 print("First time running in this directory. Setting up the database...")
                 first_time_functions(conn)
                 print("Setup complete. Updating now.")
+                if import_csv:
+                    update_database_from_csv(conn, 'album_data.csv')
                 update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
     else:
         if not check_if_table_exists(conn, "albums"):
             print("First time running in this directory. Setting up the database...")
             first_time_functions(conn)
+            if import_csv:
+                update_database_from_csv(conn, 'album_data.csv')
             print("Setup complete. Run again to perform updates.")
         else:
             conn = sqlite3.connect(db_name)
@@ -149,15 +160,21 @@ def main(update, db_name=db_name):
                     check_if_populated(conn, "saved_albums")):
                     print("Database is populated. Running other functions...")
                     if should_execute_function(conn):
-                         update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
-                         set_last_executed_date(conn, datetime.datetime.now())
+                        if import_csv:
+                            update_database_from_csv(conn, 'album_data.csv')
+                        update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
+                        set_last_executed_date(conn, datetime.datetime.now())
                 else:
                     print("Database is not fully populated. Setting up the database...")
                     first_time_functions(conn)
+                    if import_csv:
+                        update_database_from_csv(conn, 'album_data.csv')
                     print("Setup complete. Run again to perform updates.")
             else:
                 print("First time running in this directory. Setting up the database...")
                 first_time_functions(conn)
+                if import_csv:
+                    update_database_from_csv(conn, 'album_data.csv')
                 print("Setup complete. Run again to perform updates.")
     conn.close()
 
@@ -296,6 +313,7 @@ def update_album_artist_ids(conn):
 
 # Marks albums in the database as saved if they exist in the saved_albums table.
 def update_saved_spotify_albums(conn):
+    conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
     cursor = conn.cursor()
     cursor.execute("""UPDATE albums
                       SET saved = 'saved'
@@ -1561,32 +1579,7 @@ def get_with_retry(url, headers, max_retries=3):
         except (requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
             print(f"Error occurred: {e}, retrying...")
             retries += 1
-    return None
-
-def update_database_from_csv(conn, csv_path: str):
-
-    cursor = conn.cursor()
-
-    df = pd.read_csv(csv_path)
-
-    for idx, row in df.iterrows():
-        cursor.execute("""
-            UPDATE albums
-            SET
-                release_year = COALESCE(release_year, ?),
-                genre = COALESCE(genre, ?),
-                release_type = COALESCE(release_type, ?),
-                cover_art_url = COALESCE(cover_art_url, ?),
-                spotify_url = COALESCE(spotify_url, ?),
-                mbid = COALESCE(mbid, ?),
-                country = COALESCE(country, ?),
-                release_length = COALESCE(release_length, ?),
-                spotify_id = COALESCE(spotify_id, ?)
-            WHERE album_name = ? AND artist_name = ?
-        """, (row['release_year'], row['genre'], row['release_type'], row['cover_art_url'], row['spotify_url'], row['mbid'], row['country'], row['release_length'], row['spotify_id'], row['album_name'], row['artist_name']))
-
-    conn.commit()
-    # conn.close()
+    return None 
 
 
 def update_artist_genres(conn):
@@ -1658,5 +1651,40 @@ def update_artist_new_scrobbles(conn):
             cursor.execute("UPDATE artists SET scrobble_count = ? WHERE artist_name = ?", (scrobble_count[0], artist[0]))
 
     conn.commit()
+
+
+def update_database_from_csv(conn, csv_path):
+    try:
+        cursor = conn.cursor()
+
+        # Read the CSV file using pandas. If your CSV file is tab-delimited, use '\t' as the delimiter
+        df = pd.read_csv(csv_path, delimiter='\t')
+
+        # Iterate over each row in the DataFrame
+        for idx, row in df.iterrows():
+            try:
+                # Update each row in the database
+                cursor.execute("""
+                    UPDATE albums
+                    SET
+                        release_year = COALESCE(release_year, ?),
+                        genre = COALESCE(genre, ?),
+                        release_type = COALESCE(release_type, ?),
+                        cover_art_url = COALESCE(cover_art_url, ?),
+                        spotify_url = COALESCE(spotify_url, ?),
+                        mbid = COALESCE(mbid, ?),
+                        country = COALESCE(country, ?),
+                        release_length = COALESCE(release_length, ?),
+                        spotify_id = COALESCE(spotify_id, ?)
+                    WHERE album_name = ? AND artist_name = ?
+                """, (row['release_year'], row['genre'], row['release_type'], row['cover_art_url'], row['spotify_url'], row['mbid'], row['country'], row['release_length'], row['spotify_id'], row['album_name'], row['artist_name']))
+            except sqlite3.Error as e:
+                print(f"An error occurred when updating row {idx}: {e}")
+
+        # Commit the changes and close the connection
+        conn.commit()
+        print("Done importing data from CSV!")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 

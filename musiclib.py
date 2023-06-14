@@ -90,9 +90,10 @@ conn.commit()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--update', action='store_true', help='upgrade the database')
+    parser.add_argument('--update', action='store_true', help='update the database')
+    parser.add_argument('--import_csv', action='store_true', help='import data from csv')
     args = parser.parse_args()
-    main(args.update)
+    main(args.update, args.import_csv)
     table_name = 'saved_albums'
     num_entries = count_entries_in_table(table_name)
     print(f"The {table_name} table has {num_entries} entries.")
