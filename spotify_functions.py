@@ -215,6 +215,8 @@ def update_artist_and_album_urls(conn, spotify_token):
                 cursor.execute("UPDATE artists SET spotify_url=? WHERE artist_id=?", (artist_spotify_url, artist_id))
                 print(f"Updated Spotify URL for artist {artist_name}: {artist_spotify_url}")
 
+            if x % 25:
+            	conn.commit()
         except Exception as e:
             print(f"Error fetching Spotify URL for artist {artist_name}: {e}")
             missing_artists.append(artist_name)
@@ -242,7 +244,8 @@ def update_artist_and_album_urls(conn, spotify_token):
                 album_spotify_id = album_data['albums']['items'][0]['id']  # Extract Spotify ID
                 cursor.execute("UPDATE albums SET spotify_url=?, spotify_id=? WHERE album_id=?", (album_spotify_url, album_spotify_id, album_id))
                 print(f"Updated Spotify URL and ID for album {artist_name} - {album_name}: {album_spotify_url}, {album_spotify_id}")
-
+            if x % 25:
+            	conn.commit()
         except Exception as e:
             print(f"Error fetching Spotify URL for album {artist_name} - {album_name}: {e}")
             missing_albums.append(album_name)
