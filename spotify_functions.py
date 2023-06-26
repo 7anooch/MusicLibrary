@@ -349,6 +349,8 @@ def update_spotify_data(conn, spotify_token):
     except:
         pass
 
+    missing_albums_counter = 0  # initialize counter for missing albums
+    
     cursor.execute("SELECT artist_id, artist_name, spotify_url FROM artists WHERE spotify_url IS NULL")
     artists = cursor.fetchall()
 
@@ -410,6 +412,13 @@ def update_spotify_data(conn, spotify_token):
             else:
                 print(f"Unable to fetch Spotify data for album {album_name}.")
                 missing_albums.append(album_name)
+                missing_albums_counter += 1  # increment counter when an album is added
+                # check if counter is a multiple of 10
+                if missing_albums_counter % 10 == 0:
+                    with open('missing_albums_spotify_data.txt', 'w') as file:
+                        for album in missing_albums:
+                            file.write(f"{album}\n")
+
                 continue
 
             album_spotify_id = album_info['id']
