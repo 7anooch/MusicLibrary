@@ -112,7 +112,7 @@ def main(update, import_csv, db_name=db_name):
             print("First time running in this directory. Setting up the database...")
             first_time_functions(conn)
             if import_csv:
-                update_database_from_csv(conn, 'album_data.csv')
+                update_database_from_csv(conn)
             print("Setup complete. Updating now.")
         else:
             conn = sqlite3.connect(db_name)
@@ -125,7 +125,7 @@ def main(update, import_csv, db_name=db_name):
                     check_if_populated(conn, "saved_albums")):
                     print("Database is populated. Running other functions...")
                     if import_csv:
-                        update_database_from_csv(conn, 'album_data.csv')
+                        update_database_from_csv(conn)
                     update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
                     set_last_executed_date(conn, datetime.datetime.now())
                 else:
@@ -133,21 +133,21 @@ def main(update, import_csv, db_name=db_name):
                     first_time_functions(conn)
                     print("Setup complete. Updating now.")
                     if import_csv:
-                        update_database_from_csv(conn, 'album_data.csv')
+                        update_database_from_csv(conn)
                     update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
             else:
                 print("First time running in this directory. Setting up the database...")
                 first_time_functions(conn)
                 print("Setup complete. Updating now.")
                 if import_csv:
-                    update_database_from_csv(conn, 'album_data.csv')
+                    update_database_from_csv(conn)
                 update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
     else:
         if not check_if_table_exists(conn, "albums"):
             print("First time running in this directory. Setting up the database...")
             first_time_functions(conn)
             if import_csv:
-                update_database_from_csv(conn, 'album_data.csv')
+                update_database_from_csv(conn)
             print("Setup complete. Run again to perform updates.")
         else:
             conn = sqlite3.connect(db_name)
@@ -161,20 +161,20 @@ def main(update, import_csv, db_name=db_name):
                     print("Database is populated. Running other functions...")
                     if should_execute_function(conn):
                         if import_csv:
-                            update_database_from_csv(conn, 'album_data.csv')
+                            update_database_from_csv(conn)
                         update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
                         set_last_executed_date(conn, datetime.datetime.now())
                 else:
                     print("Database is not fully populated. Setting up the database...")
                     first_time_functions(conn)
                     if import_csv:
-                        update_database_from_csv(conn, 'album_data.csv')
+                        update_database_from_csv(conn)
                     print("Setup complete. Run again to perform updates.")
             else:
                 print("First time running in this directory. Setting up the database...")
                 first_time_functions(conn)
                 if import_csv:
-                    update_database_from_csv(conn, 'album_data.csv')
+                    update_database_from_csv(conn)
                 print("Setup complete. Run again to perform updates.")
     conn.close()
 
@@ -539,13 +539,28 @@ def update_albums_with_missing_ids(conn):
 def delete_unwanted_albums_and_artists(conn):
     cursor = conn.cursor()
 
+    min_tracks_played = config['criteria_to_keep']['min_tracks_played']
+    min_scrobbled = config['criteria_to_keep']['min_scrobbled']
+    min_length = config['criteria_to_keep']['min_length']
+    min_tracks = config['criteria_to_keep']['min_tracks']
+
     # Delete albums with num_tracks = 1 and scrobble_count = 1, unless saved is not NULL
-    cursor.execute("DELETE FROM albums WHERE num_tracks = 1 AND scrobble_count = 1 AND saved IS NULL")
+    cursor.execute("DELETE FROM albums WHERE num_tracks = 1 AND scrobble_count = 1 AND saved IS NULL AND (release_length < 30 OR release_length IS NULL)")
     deleted_album_rows = cursor.rowcount
-    cursor.execute("DELETE FROM albums WHERE num_tracks = 1 AND scrobble_count = 2 AND saved IS NULL AND release_length < 15 AND tracks_mb < 3")
+    cursor.execute("""
+        DELETE FROM albums WHERE num_tracks < ? AND scrobble_count < ? AND saved IS NULL AND release_length < ? AND tracks_mb < ?
+    """, (min_tracks_played, min_scrobbled, min_length, min_tracks))
     deleted_album_rows += cursor.rowcount
-    cursor.execute("DELETE FROM albums WHERE num_tracks = 2 AND scrobble_count = 2 AND saved IS NULL AND release_length < 15 AND tracks_mb < 3")
-    deleted_album_rows += cursor.rowcount
+
+    if config['criteria_to_keep']['singles'] == "yes":
+        cursor.execute("DELETE FROM albums WHERE release_type IS ('Single' OR 'single') AND saved IS NULL")
+        deleted_album_rows += cursor.rowcount
+    if config['criteria_to_keep']['eps'] == "yes":
+        cursor.execute("DELETE FROM albums WHERE release_type IS ('EP' OR 'ep') AND saved IS NULL")
+        deleted_album_rows += cursor.rowcount
+    if config['criteria_to_keep']['compilations'] == "yes":
+        cursor.execute("DELETE FROM albums WHERE release_type IS ('Compilation' OR 'compilation') AND saved IS NULL")
+        deleted_album_rows += cursor.rowcount
     print(f"Deleted {deleted_album_rows} unwanted albums")
 
     # Delete artists not found in the albums table
@@ -1123,7 +1138,7 @@ def setup_database(conn, db_name):
         country TEXT,
         release_length INTEGER,
         tracks_mb INTEGER,
-        spotify_id, TEXT,
+        spotify_id, TEXT
         FOREIGN KEY (artist_id) REFERENCES artists(artist_id)
     )
     ''')
@@ -1653,12 +1668,14 @@ def update_artist_new_scrobbles(conn):
     conn.commit()
 
 
-def update_database_from_csv(conn, csv_path):
+def update_database_from_csv(conn):
+    albumdat = 'album_data.csv'
+    artistdat = 'artist_data.csv'
     try:
         cursor = conn.cursor()
 
         # Read the CSV file using pandas. If your CSV file is tab-delimited, use '\t' as the delimiter
-        df = pd.read_csv(csv_path, delimiter='\t')
+        df = pd.read_csv(albumdat, delimiter='\t')
 
         # Iterate over each row in the DataFrame
         for idx, row in df.iterrows():
@@ -1681,9 +1698,33 @@ def update_database_from_csv(conn, csv_path):
             except sqlite3.Error as e:
                 print(f"An error occurred when updating row {idx}: {e}")
 
+        conn.commit()
+        print("Done importing album data from CSV!")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    try:
+        cursor = conn.cursor()
+
+        # Read the CSV file using pandas. If your CSV file is tab-delimited, use '\t' as the delimiter
+        df = pd.read_csv(artistdat, delimiter='\t')
+
+        # Iterate over each row in the DataFrame
+        for idx, row in df.iterrows():
+            try:
+                # Update each row in the database
+                cursor.execute("""
+                    UPDATE artists
+                    SET
+                        spotify_url = COALESCE(spotify_url, ?)
+                    WHERE artist_name = ?
+                """, (row['spotify_url'], row['artist_name']))
+            except sqlite3.Error as e:
+                print(f"An error occurred when updating row {idx}: {e}")
+
         # Commit the changes and close the connection
         conn.commit()
-        print("Done importing data from CSV!")
+        print("Done importing artist data from CSV!")
     except Exception as e:
         print(f"An error occurred: {e}")
 

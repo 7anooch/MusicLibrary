@@ -19,6 +19,17 @@
   },
   "discogs": {
     "token": "[your discogs token]"
+  },
+  "criteria_to_keep": {
+    "min_tracks_played": 3,
+    "min_tracks": 3,
+    "min_length": 15,
+    "min_scrobbled": 3,
+    "comment": "Albums with less than 'min_tracks_played' tracks, shorter than 'min_length' minutes, have less than 'min_scrobbled' scrobbles, with less than 'min_tracks' tracks will be automatically deleted. All the criteria above have to be met for automatic deletion. If an album is saved on spotify, it will not be deleted regardless. If you don't want anything to be deleted automatically, set all the above criteria to 1. 'min_tracks_played' refers to the tracks on a release that *you* have listened to, whereas 'min_tracks' refers to the number of tracks in a release.",
+    "singles": "yes",
+    "eps": "yes",
+    "compilations": "no",
+    "comment2": "If 'singles', 'eps' or 'compilations' are set to 'no', they will be automatically deleted regardless of the criteria above, unless they are saved on spotify. If set to yes, the criteria above will be followed."
   }
 }
 
