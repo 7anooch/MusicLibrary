@@ -35,60 +35,6 @@ def fetch_musicbrainz_artist_data(artist_name):
     return data
 
 # NOT CURRENTLY USED
-def get_musicbrainz_genres(artist_name, album_name):
-    """ Fetches genres for the specified artist and album from MusicBrainz """
-    try:
-        result = musicbrainzngs.search_release_groups(artist=artist_name, release=album_name, limit=1)
-        genres = None
-        release_group = None
-        if 'release-group-list' in result and result['release-group-list']:
-            release_group = result['release-group-list'][0]
-            if 'tag-list' in release_group:
-                genres = [tag['name'] for tag in release_group['tag-list']]
-                genres = ', '.join(genres)
-                
-        if release_group:
-            # Fetch the release ID as well
-            release_id = release_group['id']
-            return (genres, release_id)
-        else:
-            return (None, None)
-    except musicbrainzngs.MusicBrainzError as e:
-        print(f"Error fetching genres for {album_name}: {e}")
-    return (None, None)
-
-# NOT CURRENTLY USED
-def update_albums_with_genres(conn):
-    """ Update album genres and cover art using MusicBrainz data """
-    cursor = conn.cursor()
-    cursor.execute("SELECT album_id, artist_name, album_name FROM albums WHERE genres IS NULL OR genres = ''")
-    albums = cursor.fetchall()
-
-    not_found_albums = []
-
-    for album_id, artist_name, album_name in albums:
-        genres, release_id = get_musicbrainz_genres(artist_name, album_name)
-        if genres:
-            cursor.execute("UPDATE albums SET genres=? WHERE album_id=?", (genres, album_id))
-            print(f"Updated genres for {artist_name} - {album_name}: {genres}")
-        else:
-            not_found_albums.append(f"{artist_name} - {album_name}")
-            print(f"No genres found for {artist_name} - {album_name}")
-
-    if release_id:
-            cover_art_url = fetch_cover_art_url(release_id)
-            if cover_art_url:
-                cursor.execute("UPDATE albums SET cover_art_url=? WHERE album_id=?", (cover_art_url, album_id))
-                print(f"Updated cover art for {artist_name} - {album_name}: {cover_art_url}")
-
-    conn.commit()
-
-    # Save the list of albums with no genres found to a text file
-    with open('albums_no_genres_found.txt', 'w') as file:
-        for album in not_found_albums:
-            file.write(album + '\n') #old version?
-
-# NOT CURRENTLY USED
 def fetch_cover_art_url(release_id):
     """ Get cover art URL using MusicBrainz release ID """
     cover_art_url = f'https://coverartarchive.org/release/{release_id}/front'
@@ -275,11 +221,18 @@ def update_release_info(conn):
 
     # Counter for batch commits
     update_count = 0
+    album_count = 0
+
+    try:
+        with open('error_album_ids.txt', 'r') as f:
+            error_album_ids = f.read().splitlines()
+    except FileNotFoundError:
+        error_album_ids = []
 
     for album in albums:
         album_id, mbid = album
-
-        if mbid is None:
+        album_count += 1
+        if mbid is None or album_id in error_album_ids:
             continue
 
         try:
@@ -322,15 +275,35 @@ def update_release_info(conn):
                 conn.commit()  # Commit the changes to the database
                 print(f"Committed updates for {update_count} albums.")
 
+            if album_count % 25 == 0:
+                with open('error_album_ids.txt', 'w') as f:
+                    for album_id in error_album_ids:
+                        f.write("%s\n" % album_id)
+
         except musicbrainzngs.ResponseError as err:
             print(f"Response error with album {album_id}, MBID {mbid}: {err}")
+            error_album_ids.append(album_id)
+            if album_count % 25 == 0:
+                with open('error_album_ids.txt', 'w') as f:
+                    for album_id in error_album_ids:
+                        f.write("%s\n" % album_id)
+
         except musicbrainzngs.MusicBrainzError as e:
             print(f"Error fetching release info for album {album_id}: {e}")
+            error_album_ids.append(album_id)
+            if album_count % 25 == 0:
+                with open('error_album_ids.txt', 'w') as f:
+                    for album_id in error_album_ids:
+                        f.write("%s\n" % album_id)
+
+
+    with open('error_album_ids.txt', 'w') as f:
+        for album_id in error_album_ids:
+            f.write("%s\n" % album_id)
 
     if update_count % 25 != 0:  # If the last batch was less than 25
         conn.commit()  # Commit the remaining updates
         print(f"Committed updates for {update_count} albums.")
-
 
 
 
