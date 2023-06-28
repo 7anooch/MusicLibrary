@@ -6,6 +6,6 @@ discogs_client
 pylast
 datetime
 bs4
-matplotlib
 rapidfuzz
 PyQt5
+pandas
