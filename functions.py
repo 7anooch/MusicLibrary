@@ -1669,8 +1669,10 @@ def update_artist_new_scrobbles(conn):
 
 
 def update_database_from_csv(conn):
-    albumdat = 'album_data.csv'
-    artistdat = 'artist_data.csv'
+
+    albumdat = input('Please enter the name of the album data CSV file (e.g. album_data.csv): ')
+    artistdat = input('Please enter the name of the artist data CSV file (e.g. artist_data.csv): ')
+    
     try:
         cursor = conn.cursor()
 
