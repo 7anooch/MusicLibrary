@@ -1,7 +1,6 @@
 import requests, spotipy, base64, webbrowser, json, sqlite3, schedule, time, pylast, re, random, argparse
 import musicbrainzngs, discogs_client, requests.exceptions, urllib.parse, unicodedata, datetime, os, csv
 import pandas as pd
-import matplotlib.pyplot as plt
 from spotipy.oauth2 import SpotifyClientCredentials
 from urllib.parse import urlencode, urlparse, parse_qs
 from bs4 import BeautifulSoup
@@ -9,7 +8,6 @@ from urllib.parse import quote_plus
 from requests.exceptions import ConnectTimeout
 from pylast import PyLastError
 from rymscraper import rymscraper, RymUrl
-#from rymscraper import rymscraper
 from rapidfuzz import fuzz, process 
 import selenium.common.exceptions
 from lastfm_functions import *
@@ -109,8 +107,12 @@ def main(update, import_csv, db_name=db_name):
     if update:
         print('Updating...')
         if not check_if_table_exists(conn, "albums"):
-            print("First time running in this directory. Setting up the database...")
-            first_time_functions(conn)
+            if SPOTIFY_CLIENT_ID == "[your spotify client ID]" and LASTFM_API_KEY == "[your last.fm API key]":
+                print("Please set your Spotify and Last.fm API keys first.")
+                return
+            else:
+                print("First time running in this directory. Setting up the database...")
+                first_time_functions(conn)
             if import_csv:
                 update_database_from_csv(conn)
             print("Setup complete. Updating now.")
@@ -144,8 +146,12 @@ def main(update, import_csv, db_name=db_name):
                 update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
     else:
         if not check_if_table_exists(conn, "albums"):
-            print("First time running in this directory. Setting up the database...")
-            first_time_functions(conn)
+            if SPOTIFY_CLIENT_ID == "[your spotify client ID]" and LASTFM_API_KEY == "[your last.fm API key]":
+                print("Please set your Spotify and Last.fm API keys first.")
+                return
+            else:
+                print("First time running in this directory. Setting up the database...")
+                first_time_functions(conn)
             if import_csv:
                 update_database_from_csv(conn)
             print("Setup complete. Run again to perform updates.")
@@ -1672,7 +1678,7 @@ def update_database_from_csv(conn):
 
     albumdat = input('Please enter the name of the album data CSV file (e.g. album_data.csv): ')
     artistdat = input('Please enter the name of the artist data CSV file (e.g. artist_data.csv): ')
-    
+
     try:
         cursor = conn.cursor()
 

@@ -34,16 +34,9 @@ else:
 d = discogs_client.Client("MusicLibrary/0.1", user_token=config['discogs']['token'])
 musicbrainzngs.set_useragent("MusicLibrary", "0.1", "youremail@gmail.com")
 
-
-# db_path = "lastfm_dump.db"  # Replace with the path to your SQLite database file
-#db_name = "MusicLibrary.db"
 conn = sqlite3.connect(db_name, isolation_level=None)
 conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
 
-#fetch_scrobbles_and_save_to_db(conn)
-#(LASTFM_API_KEY, LASTFM_USER, conn)
-#delete_duplicate_scrobbles(conn)
- 
 
 cursor = conn.cursor()
 #cursor.execute("SELECT album_id, spotify_url FROM albums")
@@ -52,41 +45,14 @@ cursor = conn.cursor()
 #    spotify_uri = url_to_uri(spotify_url)
 #    cursor.execute("UPDATE albums SET spotify_uri = ? WHERE album_id = ?", (spotify_uri, album_id))
 
-#add_latest_timestamp_to_updates(conn)
-# delete_unwanted_albums_and_artists(conn)
-# update_album_mbid(conn)
-# update_release_info(conn)
-# update_spotify_ids(conn)
-# update_album_durations(conn)
-
-# insert_initial_last_executed_date(conn)
-
-#reset_executed_functions(conn)
-# update_albums_with_release_years(conn)
-# update_rym_genres(conn, use_scraperapi=USE_SCRAPER)
-# update_release_info(conn)
-# update_albums_with_cover_arts(conn, LASTFM_API_KEY)
-# update_artists_with_images(conn)
-# update_albums_with_lastfm_release_years(conn, LASTFM_API_KEY)
-# stoken = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
-# is_spotify_token_valid(stoken)
-# #update_missing_album_data(conn, stoken)
-# update_spotify_data(conn, stoken)
-
-
-
 
 # Commit the changes to the database
 conn.commit()
-
-#spotify_access_token = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
-#update_missing_album_data(conn, spotify_access_token)
 
 # if should_execute_function(conn):
 #     update_databases(conn, LASTFM_USER, LASTFM_API_KEY)
 #     set_last_executed_date(conn, datetime.datetime.now())
 
-#conn.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -94,15 +60,16 @@ if __name__ == "__main__":
     parser.add_argument('--import_csv', action='store_true', help='import data from csv')
     args = parser.parse_args()
     main(args.update, args.import_csv)
-    table_name = 'saved_albums'
-    num_entries = count_entries_in_table(table_name)
-    print(f"The {table_name} table has {num_entries} entries.")
-    table_name = 'albums'
-    num_entries = count_entries_in_table(table_name)
-    print(f"The {table_name} table has {num_entries} entries.")
-    table_name = 'artists'
-    num_entries = count_entries_in_table(table_name)
-    print(f"The {table_name} table has {num_entries} entries.")
+    if check_if_table_exists(conn, "albums"):
+        table_name = 'saved_albums'
+        num_entries = count_entries_in_table(table_name)
+        print(f"The {table_name} table has {num_entries} entries.")
+        table_name = 'albums'
+        num_entries = count_entries_in_table(table_name)
+        print(f"The {table_name} table has {num_entries} entries.")
+        table_name = 'artists'
+        num_entries = count_entries_in_table(table_name)
+        print(f"The {table_name} table has {num_entries} entries.")
 
 conn.close() 
 
