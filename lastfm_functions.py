@@ -23,6 +23,7 @@ def update_albums_with_cover_arts(conn, api_key):
     albums = cursor.fetchall()
 
     missing_cover_arts = []
+    counter = 0
 
     try:
         with open('missing_cover_arts.txt', 'r') as file:
@@ -32,6 +33,7 @@ def update_albums_with_cover_arts(conn, api_key):
 
     for album_id, artist_name, album_name in albums:
         full_album_name = f"{artist_name} - {album_name}"
+        counter += 1
         if full_album_name in missing_cover_arts:
             continue
         cover_art_url = get_lastfm_cover_art_url(api_key, artist_name, album_name)
@@ -41,6 +43,11 @@ def update_albums_with_cover_arts(conn, api_key):
         else:
             print(f"No cover art found for {album_name}")
             missing_cover_arts.append(full_album_name)
+
+        if counter % 15 ==0:
+            with open('missing_cover_arts.txt', 'w') as file:
+                for album in missing_cover_arts:
+                    file.write(f"{album}\n")
 
     with open('missing_cover_arts.txt', 'w') as file:
         for album in missing_cover_arts:
@@ -80,6 +87,7 @@ def update_artists_with_images(conn):
 
     for artist_id, artist_name in artists:
         if artist_name:  # Check if the artist_name is not None
+
             if artist_name in existing_artists:
                 continue
 
@@ -248,6 +256,7 @@ def update_albums_with_lastfm_release_years(conn, lastfm_api_key):
     albums = cursor.fetchall()
 
     missing_release_years = []
+    missing_counter = 0
 
     try:
         with open("missing_release_years.txt", "r") as file:
@@ -260,6 +269,8 @@ def update_albums_with_lastfm_release_years(conn, lastfm_api_key):
         if full_album_name in missing_release_years:
             continue
 
+        missing_counter += 1
+
         release_year = get_lastfm_release_year(artist_name, album_name, lastfm_api_key)
         if release_year:
             cursor.execute("UPDATE albums SET release_year=? WHERE album_id=?", (release_year, album_id))
@@ -267,6 +278,10 @@ def update_albums_with_lastfm_release_years(conn, lastfm_api_key):
         else:
             print(f"No release year found for {album_name}")
             missing_release_years.append(f"{artist_name} - {album_name}")
+        if missing_counter % 15 == 0:
+            with open("missing_release_years.txt", "w") as file:
+                for album in missing_release_years: 
+                    file.write(f"{album}\n")
 
     with open("missing_release_years.txt", "w") as file:
         for album in missing_release_years: 

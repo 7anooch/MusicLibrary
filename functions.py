@@ -1138,7 +1138,7 @@ def setup_database(conn, db_name):
         country TEXT,
         release_length INTEGER,
         tracks_mb INTEGER,
-        spotify_id, TEXT
+        spotify_id TEXT,
         FOREIGN KEY (artist_id) REFERENCES artists(artist_id)
     )
     ''')
