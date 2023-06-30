@@ -163,7 +163,7 @@ def update_rym_genres(conn, use_scraperapi=False):
 
 		if (artist_name, album_name) in skipped_albums:
 			continue
-		elif album_name is '':
+		elif album_name == '':
 			continue
 
 		if x % 4 == 0 and use_scraperapi==False:
