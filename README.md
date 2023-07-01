@@ -18,7 +18,8 @@ For people unfamiliar with how to use a command line interface, 3 commands are u
 
 **Step 3: Download the Software**
 
-- Navigate to the folder you want to put the software in, then right click and select “git bash here”
+- Navigate to the folder you want to put the software in, then right click and select “git bash here” (On Mac/Linux, open your terminal and navigate to the folder you want)
+- enter the command `git clone https://github.com/7anooch/MusicLibrary.git
 - enter the command: `./install.sh`
 - Assuming all goes well, it will install a bunch of software. It may ask you to install Visual C++ Build Tools, I’m not sure why. If its unable to install a package, you might be able to find the package directly at https://www.lfd.uci.edu/~gohlke/pythonlibs/ and then install it by using `pip install [package you just downloaded]`
 
