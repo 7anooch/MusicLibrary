@@ -225,7 +225,7 @@ def update_release_info(conn):
 
     try:
         with open('error_album_ids.txt', 'r') as f:
-            error_album_ids = f.read().splitlines()
+            error_album_ids = [int(id) for id in f.read().splitlines()]
     except FileNotFoundError:
         error_album_ids = []
 
@@ -278,7 +278,7 @@ def update_release_info(conn):
             if album_count % 25 == 0:
                 with open('error_album_ids.txt', 'w') as f:
                     for album_id in error_album_ids:
-                        f.write("%s\n" % album_id)
+                        f.write("%d\n" % album_id)
 
         except musicbrainzngs.ResponseError as err:
             print(f"Response error with album {album_id}, MBID {mbid}: {err}")
@@ -286,7 +286,7 @@ def update_release_info(conn):
             if album_count % 25 == 0:
                 with open('error_album_ids.txt', 'w') as f:
                     for album_id in error_album_ids:
-                        f.write("%s\n" % album_id)
+                        f.write("%d\n" % album_id)
 
         except musicbrainzngs.MusicBrainzError as e:
             print(f"Error fetching release info for album {album_id}: {e}")
@@ -294,12 +294,12 @@ def update_release_info(conn):
             if album_count % 25 == 0:
                 with open('error_album_ids.txt', 'w') as f:
                     for album_id in error_album_ids:
-                        f.write("%s\n" % album_id)
+                        f.write("%d\n" % album_id)
 
 
     with open('error_album_ids.txt', 'w') as f:
         for album_id in error_album_ids:
-            f.write("%s\n" % album_id)
+            f.write("%d\n" % album_id)
 
     if update_count % 25 != 0:  # If the last batch was less than 25
         conn.commit()  # Commit the remaining updates

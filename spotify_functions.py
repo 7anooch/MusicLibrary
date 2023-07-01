@@ -138,7 +138,6 @@ def update_saved_albums(conn, recent_albums):
 					   (artist_name, album_name, saved_timestamp))
 		conn.commit()
 
-# check
 def parse_saved_albums(response_json):
 	""" Extract artist and album names from Spotify response JSON"""
 	albums = []
@@ -318,7 +317,6 @@ def save_recent_saved_albums(conn, token, last_update):
 	""", ("recent_saved_albums", json.dumps(response_json)))
 	conn.commit()
 
-# very confused by thus function? ckeck
 def parse_and_insert_saved_albums(conn):
 	""" Parses and inserts saved albums from Spotify API response"""
 	cursor = conn.cursor()
