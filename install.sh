@@ -1,6 +1,5 @@
 #/bin/sh
 
-git clone https://github.com/7anooch/MusicLibrary.git
 git clone https://github.com/dbeley/rymscraper.git
 cd rymscraper
 pip install -r requirements.txt
