@@ -317,17 +317,61 @@ def update_album_artist_ids(conn):
 
     conn.commit()
 
-# Marks albums in the database as saved if they exist in the saved_albums table.
+# # Marks albums in the database as saved if they exist in the saved_albums table.
+# def update_saved_spotify_albums(conn):
+#     conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
+#     cursor = conn.cursor()
+#     cursor.execute("""UPDATE albums
+#                       SET saved = 'saved'
+#                       WHERE EXISTS (SELECT 1 FROM saved_albums
+#                                     WHERE IGNORE_PARENTHESIS_AND_BRACKETS(albums.album_name, saved_albums.album_name)
+#                                     AND albums.artist_name = saved_albums.artist_name)
+#                    """)
+#     conn.commit()
+
+
 def update_saved_spotify_albums(conn):
     conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
     cursor = conn.cursor()
-    cursor.execute("""UPDATE albums
-                      SET saved = 'saved'
-                      WHERE EXISTS (SELECT 1 FROM saved_albums
-                                    WHERE IGNORE_PARENTHESIS_AND_BRACKETS(albums.album_name, saved_albums.album_name)
-                                    AND albums.artist_name = saved_albums.artist_name)
-                   """)
+    
+    ALBUM_ID = 0
+    ALBUM_NAME = 1
+    ARTIST_NAME = 2
+
+    # Query all saved albums
+    cursor.execute("SELECT * FROM saved_albums")
+    saved_albums = cursor.fetchall()
+    
+    for saved_album in saved_albums:
+        saved_album_name = saved_album[ALBUM_NAME]
+        saved_artist_name = saved_album[ARTIST_NAME]
+        
+        # Check if the album already exists in the albums table
+        cursor.execute("""
+            SELECT * FROM albums 
+            WHERE IGNORE_PARENTHESIS_AND_BRACKETS(album_name, ?)
+            AND artist_name = ?
+        """, (saved_album_name, saved_artist_name))
+        
+        album = cursor.fetchone()
+        
+        if album is None:
+            # Album does not exist in the albums table, so insert it
+            cursor.execute("""
+                INSERT INTO albums (album_name, artist_name, saved)
+                VALUES (?, ?, 'saved')
+            """, (saved_album_name, saved_artist_name))
+        else:
+            # Album exists in the albums table, so update it
+            cursor.execute("""
+                UPDATE albums 
+                SET saved = 'saved'
+                WHERE album_id = ?
+            """, (album[ALBUM_ID],))
+    
     conn.commit()
+
+
 
 # Creates a table for storing update timestamps
 def create_updates_table(conn):
@@ -831,15 +875,16 @@ def save_spotify_access_token(conn, client_id, client_secret, redirect_uri, scop
 # Updates various tables in the database with new data from Last.fm and Spotify
 def update_databases(conn, lastfm_username, lastfm_api_key):
     cursor = conn.cursor()
-    function_names = ["fetch_timestamp_lastfm", "fetch_timestamp_spotify", "spotify_access_token", "save_recent_saved_albums", 
-                      "parse_and_insert_saved_albums", "set_last_update_timestamp_spotify", "create_new_tracks_table",
-                      "create_new_playlist_table", "create_new_albums_table", "insert_scrobbles_into_new_playlist", 
-                      "populate_new_tracks_table", "populate_new_albums_table", "clean_new_album_names", "update_album_track_counts", 
-                      "update_album_scrobble_counts", "set_last_update_timestamp_lastfm", "append_and_update_albums", 
-                      "update_albums_with_missing_ids", "update_last_played", "update new artist scrobbles", "update_artist_and_album_urls", 
-                      "delete_unwanted_albums_and_artists", "update data from spotify", "update_albums_with_lastfm_release_years", 
-                      "update_album_mbid", "update_release_info", "update spotify album length", "update_rym_genres", "update artist genres", 
-                      "update_albums_with_cover_arts", "update_artists_with_images", "drop_tables"]
+    function_names = ["fetch_timestamp_lastfm", "fetch_timestamp_spotify", "spotify_access_token", "save_recent_saved_albums", "parse_and_insert_saved_albums",
+                      "set_last_update_timestamp_spotify", "create_new_tracks_table", "create_new_playlist_table", "create_new_albums_table",
+                      "insert_scrobbles_into_new_playlist", "populate_new_tracks_table", "populate_new_albums_table", "clean_new_album_names",
+                      "update_album_track_counts", "update_album_scrobble_counts", "set_last_update_timestamp_lastfm", "append_and_update_albums",
+                      "update saved spotify albums", "update_albums_with_missing_ids", "update_last_played", "update new artist scrobbles",
+                      "delete incomplete albums", "remove duplicate albums", "retrieve saved album and artist info", "update_artist_and_album_urls", 
+                      "delete_unwanted_albums_and_artists", "update data from spotify", "update_albums_with_lastfm_release_years", "update_album_mbid",
+                      "update_release_info", "update spotify album length", "delete_unwanted_albums_and_artists again", "update_rym_genres", 
+                      "update artist genres","update_albums_with_cover_arts", "update_artists_with_images", "drop_tables"]
+
     for func_name in function_names:
         cursor.execute("INSERT OR IGNORE INTO executed_functions (function_name, executed) VALUES (?, 0)", (func_name,))
     conn.commit()
@@ -907,9 +952,13 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     
     execute_if_not_done( "set_last_update_timestamp_lastfm" ,set_last_update_timestamp, conn, "lastfm", lastfm_ts)
     execute_if_not_done( "append_and_update_albums" , append_and_update_albums, conn)
+    execute_if_not_done( "update saved spotify albums", update_saved_spotify_albums, conn)
     execute_if_not_done( "update_albums_with_missing_ids" ,update_albums_with_missing_ids, conn)
     execute_if_not_done( "update_last_played",update_last_played, conn)
     execute_if_not_done( "update new artist scrobbles", update_artist_new_scrobbles, conn)
+    execute_if_not_done( "delete incomplete albums", delete_incomplete_albums, conn)
+    execute_if_not_done( "remove duplicate albums", remove_duplicates_albums, conn)
+    execute_if_not_done( "retrieve saved album and artist info", update_database_from_github_csv, conn)
     execute_if_not_done( "update_artist_and_album_urls" ,update_artist_and_album_urls, conn, stoken)
 
     execute_if_not_done( "delete_unwanted_albums_and_artists", delete_unwanted_albums_and_artists, conn)
@@ -917,7 +966,8 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done( "update_albums_with_lastfm_release_years" ,update_albums_with_lastfm_release_years, conn, LASTFM_API_KEY)
     execute_if_not_done( "update_album_mbid" , update_album_mbid, conn)
     execute_if_not_done( "update_release_info" , update_release_info, conn)
-    execute_if_not_done("update spotify album length", update_album_durations, conn)
+    execute_if_not_done( "update spotify album length", update_album_durations, conn)
+    execute_if_not_done( "delete_unwanted_albums_and_artists again", delete_unwanted_albums_and_artists, conn)
     execute_if_not_done( "update_rym_genres" , update_rym_genres, conn, use_scraperapi=USE_SCRAPER)
     execute_if_not_done( "update artist genres" , update_artist_genres, conn)
     execute_if_not_done( "update_albums_with_cover_arts" ,update_albums_with_cover_arts, conn, LASTFM_API_KEY)
@@ -1358,6 +1408,7 @@ def remove_duplicates_albums(conn):
 
     # Get a list of unique album names (after cleaning)
     unique_albums = get_unique_albums(albums)
+    num_duplicates_removed = 0
 
     # For each unique album, find all fuzzy matches from the original albums
     for unique_album in unique_albums:
@@ -1371,9 +1422,11 @@ def remove_duplicates_albums(conn):
             update_album_in_database(conn, album_to_keep)
 
             # Delete the other duplicate albums from the database
-            delete_duplicate_albums(conn, matched_albums, album_to_keep)
+            num_deleted = delete_duplicate_albums(conn, matched_albums, album_to_keep)
+            num_duplicates_removed += 1
 
     conn.commit()
+    print(f"Removed {num_duplicates_removed} duplicate albums.")
 
 def get_unique_albums(albums):
     unique_albums = []
@@ -1402,7 +1455,7 @@ def find_fuzzy_matches(target_album, albums):
 
 def determine_album_to_keep(unique_album, matched_albums):
     # Extract album names and whether they're saved
-    album_names = [(album[1], album[6] == 'true' if album[6] is not None else False, album[0]) for album in matched_albums]
+    album_names = [(album[1], album[6] == 'saved', album[0]) for album in matched_albums]
     
     # Sort albums so that saved albums are first and albums with smaller IDs are first within those groups
     album_names.sort(key=lambda x: (-x[1], x[2]))
@@ -1418,8 +1471,12 @@ def determine_album_to_keep(unique_album, matched_albums):
 def delete_duplicate_albums(conn, matched_albums, album_to_keep):
     cursor = conn.cursor()
     album_ids_to_delete = [album[0] for album in matched_albums if album[0] != album_to_keep[0]]  # Assuming album_id is at index 0
+    num_deleted = 0
     for album_id in album_ids_to_delete:
         cursor.execute("DELETE FROM albums WHERE album_id = ?", (album_id,))
+        num_deleted += 1
+
+    return num_deleted
 
 def update_album_in_database(conn, album):
     cursor = conn.cursor()
@@ -1736,4 +1793,86 @@ def update_database_from_csv(conn):
     except Exception as e:
         print(f"An error occurred: {e}")
 
+def download_latest_csv(url, filename):
+    response = requests.get(url)
+    with open(filename, 'wb') as file:
+        file.write(response.content)
+        
+def update_database_from_github_csv(conn):
+    # Hardcoded URLs of the album and artist data CSV files on GitHub
+    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230614.csv'
+    artistdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/artist_data_20230614.csv'
+    
+    # Set the names of the local files to be downloaded
+    albumdat = "album_data_20230614.csv"
+    artistdat = "artist_data_20230614.csv"
 
+    # Download the CSV files
+    download_latest_csv(albumdat_url, albumdat)
+    download_latest_csv(artistdat_url, artistdat)
+
+    cursor = conn.cursor()
+
+    album_counter = 0
+    artist_counter = 0
+
+    try:
+        # Read the CSV file using pandas. If your CSV file is tab-delimited, use '\t' as the delimiter
+        df = pd.read_csv(albumdat, delimiter='\t')
+
+        # Iterate over each row in the DataFrame
+        for idx, row in df.iterrows():
+            try:
+                # Update each row in the database
+                cursor.execute("""
+                    UPDATE albums
+                    SET
+                        release_year = COALESCE(release_year, ?),
+                        genre = COALESCE(genre, ?),
+                        release_type = COALESCE(release_type, ?),
+                        cover_art_url = COALESCE(cover_art_url, ?),
+                        spotify_url = COALESCE(spotify_url, ?),
+                        mbid = COALESCE(mbid, ?),
+                        country = COALESCE(country, ?),
+                        release_length = COALESCE(release_length, ?),
+                        spotify_id = COALESCE(spotify_id, ?)
+                    WHERE album_name = ? AND artist_name = ?
+                """, (row['release_year'], row['genre'], row['release_type'], row['cover_art_url'], row['spotify_url'], row['mbid'], row['country'], row['release_length'], row['spotify_id'], row['album_name'], row['artist_name']))
+
+                if cursor.rowcount > 0:  # if an album was updated
+                    album_counter += 1
+
+            except sqlite3.Error as e:
+                print(f"An error occurred when updating row {idx}: {e}")
+
+        conn.commit()
+        print(f"Done importing album data from CSV! {album_counter} albums updated.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    try:
+        # Read the CSV file using pandas. If your CSV file is tab-delimited, use '\t' as the delimiter
+        df = pd.read_csv(artistdat, delimiter='\t')
+
+        # Iterate over each row in the DataFrame
+        for idx, row in df.iterrows():
+            try:
+                # Update each row in the database
+                cursor.execute("""
+                    UPDATE artists
+                    SET
+                        spotify_url = COALESCE(spotify_url, ?)
+                    WHERE artist_name = ?
+                """, (row['spotify_url'], row['artist_name']))
+
+                if cursor.rowcount > 0:  # if an artist was updated
+                    artist_counter += 1
+
+            except sqlite3.Error as e:
+                print(f"An error occurred when updating row {idx}: {e}")
+
+        # Commit the changes and close the connection
+        conn.commit()
+        print(f"Done importing artist data from CSV! {artist_counter} artists updated.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
