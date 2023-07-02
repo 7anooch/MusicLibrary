@@ -30,6 +30,13 @@ d = discogs_client.Client("MusicLibrary/0.1", user_token=config['discogs']['toke
 SCRAPERAPI_KEY = config['scraperapi']['key']
 MUSICBRAINZ_API_URL = "https://musicbrainz.org/ws/2/"
 
+if config['spotify']['use'] == 'yes':
+    use_spotify = True
+elif config['spotify']['use'] == 'no':
+    use_spotify = False
+
+# if SPOTIFY_CLIENT_ID == "[your spotify client ID]" and SPOTIFY_CLIENT_SECRET == "[your spotify client secret]":
+#     use_spotify = False
 
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36',
@@ -108,7 +115,7 @@ def main(update, import_csv, db_name=db_name):
         print('Updating...')
         if not check_if_table_exists(conn, "albums"):
             if SPOTIFY_CLIENT_ID == "[your spotify client ID]" and LASTFM_API_KEY == "[your last.fm API key]":
-                print("Please set your Spotify and Last.fm API keys first.")
+                print("Please set your Spotify and Last.fm API keys first. You can choose to only set a Last.fm API key if you wish.")
                 return
             else:
                 print("First time running in this directory. Setting up the database...")
@@ -120,11 +127,9 @@ def main(update, import_csv, db_name=db_name):
             conn = sqlite3.connect(db_name)
             print("Database exists. Checking if it's populated...")
             if (check_if_table_exists(conn, "albums") and 
-                check_if_table_exists(conn, "artists") and 
-                check_if_table_exists(conn, "saved_albums")):
+                check_if_table_exists(conn, "artists")):
                 if (check_if_populated(conn, "albums") and 
-                    check_if_populated(conn, "artists") and 
-                    check_if_populated(conn, "saved_albums")):
+                    check_if_populated(conn, "artists")):
                     print("Database is populated. Running other functions...")
                     if import_csv:
                         update_database_from_csv(conn)
@@ -147,7 +152,7 @@ def main(update, import_csv, db_name=db_name):
     else:
         if not check_if_table_exists(conn, "albums"):
             if SPOTIFY_CLIENT_ID == "[your spotify client ID]" and LASTFM_API_KEY == "[your last.fm API key]":
-                print("Please set your Spotify and Last.fm API keys first.")
+                print("Please set your Spotify and Last.fm API keys first. You can choose to only set a Last.fm API key if you wish.")
                 return
             else:
                 print("First time running in this directory. Setting up the database...")
@@ -159,11 +164,9 @@ def main(update, import_csv, db_name=db_name):
             conn = sqlite3.connect(db_name)
             print("Database exists. Checking if it's populated...")
             if (check_if_table_exists(conn, "albums") and 
-                check_if_table_exists(conn, "artists") and 
-                check_if_table_exists(conn, "saved_albums")):
+                check_if_table_exists(conn, "artists")):
                 if (check_if_populated(conn, "albums") and 
-                    check_if_populated(conn, "artists") and 
-                    check_if_populated(conn, "saved_albums")):
+                    check_if_populated(conn, "artists")):
                     print("Database is populated. Running other functions...")
                     if should_execute_function(conn):
                         if import_csv:
@@ -546,7 +549,10 @@ def append_and_update_albums(conn):
         if existing_album:
             # If the album exists, add the scrobble_count value from the new_albums table
             album_id, existing_scrobble_count = existing_album
-            updated_scrobble_count = existing_scrobble_count + scrobble_count
+            if existing_scrobble_count != None:
+                updated_scrobble_count = existing_scrobble_count + scrobble_count
+            elif existing_scrobble_count == None:
+                updated_scrobble_count = scrobble_count
             cursor.execute("UPDATE albums SET scrobble_count=? WHERE album_id=?", (updated_scrobble_count, album_id))
             print(f"Updated scrobble_count for {artist_name} - {album_name}: {updated_scrobble_count}")
         else:
@@ -875,8 +881,18 @@ def save_spotify_access_token(conn, client_id, client_secret, redirect_uri, scop
 # Updates various tables in the database with new data from Last.fm and Spotify
 def update_databases(conn, lastfm_username, lastfm_api_key):
     cursor = conn.cursor()
-    function_names = ["fetch_timestamp_lastfm", "fetch_timestamp_spotify", "spotify_access_token", "save_recent_saved_albums", "parse_and_insert_saved_albums",
+    if use_spotify:
+        function_names = ["fetch_timestamp_lastfm", "fetch_timestamp_spotify", "spotify_access_token", "save_recent_saved_albums", "parse_and_insert_saved_albums",
                       "set_last_update_timestamp_spotify", "create_new_tracks_table", "create_new_playlist_table", "create_new_albums_table",
+                      "insert_scrobbles_into_new_playlist", "populate_new_tracks_table", "populate_new_albums_table", "clean_new_album_names",
+                      "update_album_track_counts", "update_album_scrobble_counts", "set_last_update_timestamp_lastfm", "append_and_update_albums",
+                      "update saved spotify albums", "update_albums_with_missing_ids", "update_last_played", "update new artist scrobbles",
+                      "delete incomplete albums", "remove duplicate albums", "retrieve saved album and artist info", "update_artist_and_album_urls", 
+                      "delete_unwanted_albums_and_artists", "update data from spotify", "update_albums_with_lastfm_release_years", "update_album_mbid",
+                      "update_release_info", "update spotify album length", "delete_unwanted_albums_and_artists again", "update_rym_genres", 
+                      "update artist genres","update_albums_with_cover_arts", "update_artists_with_images", "drop_tables"]
+    elif not use_spotify:
+        function_names = ["fetch_timestamp_lastfm", "create_new_tracks_table", "create_new_playlist_table", "create_new_albums_table",
                       "insert_scrobbles_into_new_playlist", "populate_new_tracks_table", "populate_new_albums_table", "clean_new_album_names",
                       "update_album_track_counts", "update_album_scrobble_counts", "set_last_update_timestamp_lastfm", "append_and_update_albums",
                       "update saved spotify albums", "update_albums_with_missing_ids", "update_last_played", "update new artist scrobbles",
@@ -927,15 +943,16 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     reset_executed_functions_if_all_done(conn)
     print('----- starting update')
     execute_if_not_done('fetch_timestamp_lastfm', get_last_update_timestamp, conn, "lastfm")
-    execute_if_not_done('fetch_timestamp_spotify', get_last_update_timestamp, conn, "spotify")
     lastfm_last_update = get_intermediate_result(conn, "lastfm_last_update")
-    spotify_last_update = get_intermediate_result(conn, "spotify_last_update")
 
-    execute_if_not_done('spotify_access_token', save_spotify_access_token, conn, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
-    stoken = get_intermediate_result(conn, "spotify_access_token")
-    execute_if_not_done("save_recent_saved_albums", save_recent_saved_albums, conn, stoken, spotify_last_update)
-    execute_if_not_done("parse_and_insert_saved_albums", parse_and_insert_saved_albums, conn)
-    execute_if_not_done("set_last_update_timestamp_spotify", set_last_update_timestamp, conn, "spotify", int(time.time()))
+    if use_spotify:
+        execute_if_not_done('fetch_timestamp_spotify', get_last_update_timestamp, conn, "spotify")
+        spotify_last_update = get_intermediate_result(conn, "spotify_last_update")
+        execute_if_not_done('spotify_access_token', save_spotify_access_token, conn, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
+        stoken = get_intermediate_result(conn, "spotify_access_token")
+        execute_if_not_done("save_recent_saved_albums", save_recent_saved_albums, conn, stoken, spotify_last_update)
+        execute_if_not_done("parse_and_insert_saved_albums", parse_and_insert_saved_albums, conn)
+        execute_if_not_done("set_last_update_timestamp_spotify", set_last_update_timestamp, conn, "spotify", int(time.time()))
     execute_if_not_done("create_new_tracks_table",create_new_tracks_table, conn)
     execute_if_not_done("create_new_playlist_table",create_new_playlist_table, conn)
     execute_if_not_done("create_new_albums_table",create_new_albums_table, conn)
@@ -952,21 +969,25 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     
     execute_if_not_done( "set_last_update_timestamp_lastfm" ,set_last_update_timestamp, conn, "lastfm", lastfm_ts)
     execute_if_not_done( "append_and_update_albums" , append_and_update_albums, conn)
-    execute_if_not_done( "update saved spotify albums", update_saved_spotify_albums, conn)
+    if use_spotify:
+        execute_if_not_done( "update saved spotify albums", update_saved_spotify_albums, conn)
     execute_if_not_done( "update_albums_with_missing_ids" ,update_albums_with_missing_ids, conn)
     execute_if_not_done( "update_last_played",update_last_played, conn)
     execute_if_not_done( "update new artist scrobbles", update_artist_new_scrobbles, conn)
     execute_if_not_done( "delete incomplete albums", delete_incomplete_albums, conn)
     execute_if_not_done( "remove duplicate albums", remove_duplicates_albums, conn)
     execute_if_not_done( "retrieve saved album and artist info", update_database_from_github_csv, conn)
-    execute_if_not_done( "update_artist_and_album_urls" ,update_artist_and_album_urls, conn, stoken)
+    if use_spotify:
+        execute_if_not_done( "update_artist_and_album_urls" ,update_artist_and_album_urls, conn, stoken)
 
     execute_if_not_done( "delete_unwanted_albums_and_artists", delete_unwanted_albums_and_artists, conn)
-    execute_if_not_done( "update data from spotify", update_spotify_data, conn, stoken)
+    if use_spotify:
+        execute_if_not_done( "update data from spotify", update_spotify_data, conn, stoken)
     execute_if_not_done( "update_albums_with_lastfm_release_years" ,update_albums_with_lastfm_release_years, conn, LASTFM_API_KEY)
     execute_if_not_done( "update_album_mbid" , update_album_mbid, conn)
     execute_if_not_done( "update_release_info" , update_release_info, conn)
-    execute_if_not_done( "update spotify album length", update_album_durations, conn)
+    if use_spotify:
+        execute_if_not_done( "update spotify album length", update_album_durations, conn)
     execute_if_not_done( "delete_unwanted_albums_and_artists again", delete_unwanted_albums_and_artists, conn)
     execute_if_not_done( "update_rym_genres" , update_rym_genres, conn, use_scraperapi=USE_SCRAPER)
     execute_if_not_done( "update artist genres" , update_artist_genres, conn)
@@ -1498,7 +1519,12 @@ def first_time_functions(conn):
     create_setup_functions_table(conn)
     cursor = conn.cursor()
 
-    function_names = ["setup database", "fetch scrobbles", "add latest scrobble timestamp", "clean album names in playlist",
+    if not use_spotify:
+        function_names = ["setup database", "fetch scrobbles", "add latest scrobble timestamp", "clean album names in playlist",
+                      "populate tracks table", "populate albums table", "update scrobble count", "update artist scrobs", 
+                      "delete incomplete albums", "delete unwanted albums", "update_last_played", "remove duplicate albums", "insert executed date"]
+    else:
+        function_names = ["setup database", "fetch scrobbles", "add latest scrobble timestamp", "clean album names in playlist",
                       "populate tracks table", "populate albums table", "update scrobble count", "update artist scrobs", "save saved albums",
                       "add spotify update timestamp", "clean saved albums", "updated saved spotify albums", 
                       "delete incomplete albums", "delete unwanted albums", "update_last_played", "remove duplicate albums", "insert executed date"]
@@ -1531,11 +1557,12 @@ def first_time_functions(conn):
     execute_if_not_done( "populate albums table", populate_albums_table, conn)
     execute_if_not_done( "update scrobble count", update_albums_table_scrobbles, conn)
     execute_if_not_done( "update artist scrobs", update_artist_scrobbles, conn)
-    token = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
-    execute_if_not_done( "save saved albums", save_spotify_saved_albums_to_db, conn, token)
-    execute_if_not_done( "add spotify update timestamp", add_current_timestamp_to_updates, conn)
-    execute_if_not_done( "clean saved albums", clean_saved_album_names, conn)
-    execute_if_not_done( "updated saved spotify albums", update_saved_spotify_albums, conn)
+    if use_spotify:
+        token = get_spotify_access_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
+        execute_if_not_done( "save saved albums", save_spotify_saved_albums_to_db, conn, token)
+        execute_if_not_done( "add spotify update timestamp", add_current_timestamp_to_updates, conn)
+        execute_if_not_done( "clean saved albums", clean_saved_album_names, conn)
+        execute_if_not_done( "updated saved spotify albums", update_saved_spotify_albums, conn)
     execute_if_not_done( "delete incomplete albums", delete_incomplete_albums, conn)
     execute_if_not_done( "delete unwanted albums", delete_unwanted_albums_and_artists, conn)
     execute_if_not_done("update_last_played", update_last_played_in_artists, conn)

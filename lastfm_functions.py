@@ -218,6 +218,7 @@ def fetch_lastfm_scrobbles(conn, api_key, api_secret, username, from_timestamp=N
             latest_scrobble_timestamp = scrobbles[0]['date']
         else:
             print("No scrobbles available after removing the first album.")
+            return scrobbles, from_timestamp
 
         return scrobbles, latest_scrobble_timestamp
 
