@@ -25,6 +25,8 @@ For people unfamiliar with how to use a command line interface, 3 commands are u
 
 **Step 4: Get API Keys**
 
+Ideally, you will need API keys from Spotify, Last.fm and ScraperAPI. The only API key that is strictly necessary is the Last.fm API key, Spotify keys are not strictly necessary, but I do recommend them. ScraperAPI is not necessary, but it helps speed things up.
+
 - For the Spotify API key, go to the Spotify Developer Dashboard and log in or create an account: https://developer.spotify.com/dashboard/
 - Click on "Create an App" and fill in the necessary information.
 - Once the app is created, you will be able to see the Client ID and Client Secret. These are your API keys. It also lets you set a callback url, set it to http://localhost:8080/callback
