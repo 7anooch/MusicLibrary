@@ -29,6 +29,11 @@ if config['scraperapi']['use'] == 'yes':
 else:
     USE_SCRAPER = False
 
+if config['spotify']['use'] == 'yes':
+    use_spotify = True
+elif config['spotify']['use'] == 'no':
+    use_spotify = False
+
 
 # discogs_client.user_agent = "MusicLibrary/0.1"  # Replace with your app name and version
 d = discogs_client.Client("MusicLibrary/0.1", user_token=config['discogs']['token'])
@@ -61,9 +66,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args.update, args.import_csv)
     if check_if_table_exists(conn, "albums"):
-        table_name = 'saved_albums'
-        num_entries = count_entries_in_table(table_name)
-        print(f"The {table_name} table has {num_entries} entries.")
+        if use_spotify:
+            table_name = 'saved_albums'
+            num_entries = count_entries_in_table(table_name)
+            print(f"The {table_name} table has {num_entries} entries.")
         table_name = 'albums'
         num_entries = count_entries_in_table(table_name)
         print(f"The {table_name} table has {num_entries} entries.")
