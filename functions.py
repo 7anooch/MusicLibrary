@@ -628,6 +628,37 @@ def delete_unwanted_albums_and_artists(conn):
 
     conn.commit()    
 
+
+def delete_unwanted_albums_again(conn):
+    cursor = conn.cursor()
+
+    min_tracks_played = config['criteria_to_keep']['min_tracks_played']
+    min_scrobbled = config['criteria_to_keep']['min_scrobbled']
+    min_length = config['criteria_to_keep']['min_length']
+    min_tracks = config['criteria_to_keep']['min_tracks']
+
+    # Delete albums with num_tracks = 1 and scrobble_count = 1, unless saved is not NULL
+    cursor.execute("DELETE FROM albums WHERE num_tracks = 1 AND scrobble_count = 1 AND saved IS NULL AND (release_length < 30 OR release_length IS NULL)")
+    deleted_album_rows = cursor.rowcount
+    cursor.execute("""
+        DELETE FROM albums WHERE num_tracks < ? AND scrobble_count < ? AND saved IS NULL AND release_length < ? AND tracks_mb < ?
+    """, (min_tracks_played, min_scrobbled, min_length, min_tracks))
+    deleted_album_rows += cursor.rowcount
+
+    if config['criteria_to_keep']['singles'] == "yes":
+        cursor.execute("DELETE FROM albums WHERE release_type IS ('Single' OR 'single') AND saved IS NULL")
+        deleted_album_rows += cursor.rowcount
+    if config['criteria_to_keep']['eps'] == "yes":
+        cursor.execute("DELETE FROM albums WHERE release_type IS ('EP' OR 'ep') AND saved IS NULL")
+        deleted_album_rows += cursor.rowcount
+    if config['criteria_to_keep']['compilations'] == "yes":
+        cursor.execute("DELETE FROM albums WHERE release_type IS ('Compilation' OR 'compilation') AND saved IS NULL")
+        deleted_album_rows += cursor.rowcount
+    print(f"Deleted {deleted_album_rows} unwanted albums")
+
+    conn.commit() 
+
+
 # Drops specified tables from the database
 def drop_tables(conn, table_names):
     cursor = conn.cursor()
@@ -889,7 +920,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
                       "update saved spotify albums", "update_albums_with_missing_ids", "update_last_played", "update new artist scrobbles",
                       "delete incomplete albums", "remove duplicate albums", "retrieve saved album and artist info", "update_artist_and_album_urls", 
                       "delete_unwanted_albums_and_artists", "update data from spotify", "update_albums_with_lastfm_release_years", "update_album_mbid",
-                      "update_release_info", "update spotify album length", "delete_unwanted_albums_and_artists again", "update_rym_genres", 
+                      "update_release_info", "update spotify album length", "delete unwanted albums again", "update_rym_genres", 
                       "update artist genres","update_albums_with_cover_arts", "update_artists_with_images", "drop_tables"]
     elif not use_spotify:
         function_names = ["fetch_timestamp_lastfm", "create_new_tracks_table", "create_new_playlist_table", "create_new_albums_table",
@@ -898,7 +929,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
                       "update saved spotify albums", "update_albums_with_missing_ids", "update_last_played", "update new artist scrobbles",
                       "delete incomplete albums", "remove duplicate albums", "retrieve saved album and artist info", "update_artist_and_album_urls", 
                       "delete_unwanted_albums_and_artists", "update data from spotify", "update_albums_with_lastfm_release_years", "update_album_mbid",
-                      "update_release_info", "update spotify album length", "delete_unwanted_albums_and_artists again", "update_rym_genres", 
+                      "update_release_info", "update spotify album length", "delete unwanted albums again", "update_rym_genres", 
                       "update artist genres","update_albums_with_cover_arts", "update_artists_with_images", "drop_tables"]
 
     for func_name in function_names:
@@ -988,7 +1019,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done( "update_release_info" , update_release_info, conn)
     if use_spotify:
         execute_if_not_done( "update spotify album length", update_album_durations, conn)
-    execute_if_not_done( "delete_unwanted_albums_and_artists again", delete_unwanted_albums_and_artists, conn)
+    execute_if_not_done( "delete unwanted albums again", delete_unwanted_albums_again, conn)
     execute_if_not_done( "update_rym_genres" , update_rym_genres, conn, use_scraperapi=USE_SCRAPER)
     execute_if_not_done( "update artist genres" , update_artist_genres, conn)
     execute_if_not_done( "update_albums_with_cover_arts" ,update_albums_with_cover_arts, conn, LASTFM_API_KEY)
