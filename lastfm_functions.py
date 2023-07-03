@@ -83,10 +83,18 @@ def update_artists_with_images(conn):
     cursor.execute("SELECT artist_id, artist_name FROM artists WHERE artist_image IS NULL")
     artists = cursor.fetchall()
 
+    counter = 0
     not_found_artists = []  # list to store artists for which images are not found
 
     for artist_id, artist_name in artists:
+
+        counter += 1
         if artist_name:  # Check if the artist_name is not None
+            if counter % 15 == 0:
+                with open('unfound_artist_images.txt', 'a') as f:
+                    for artist in not_found_artists:
+                        f.write(f"{artist}\n")
+                conn.commit()
 
             if artist_name in existing_artists:
                 continue
