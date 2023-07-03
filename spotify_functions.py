@@ -482,11 +482,18 @@ def update_album_durations(conn):
 															   client_secret=SPOTIFY_CLIENT_SECRET))
 	cursor = conn.cursor()
 	# Fetch all albums with release_length 0 or null
-	cursor.execute("SELECT album_id, spotify_id FROM albums WHERE release_length IS NULL OR release_length = 0 AND spotify_id IS NOT NULL")
+	cursor.execute("SELECT album_id, spotify_id FROM albums WHERE spotify_id IS NOT NULL AND release_length IS NULL OR release_length = 0")
 	albums = cursor.fetchall()
+
+	counter = 0
 
 	for album in albums:
 		album_id, spotify_id = album
+		counter += 1
+		
+		if counter % 25 == 0:
+			time.sleep(1)
+			conn.commit()
 
 		# If spotify_id is None, skip this iteration
 		if spotify_id is None:
