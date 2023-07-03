@@ -138,7 +138,10 @@ def get_lastfm_artist_image(artist_name):
         try:
             response = requests.get(url, params=params, timeout=10)
             if response.status_code == 200:
-                data = response.json()
+                try:
+                    data = response.json()
+                except requests.exceptions.JSONDecodeError:
+                    print(f"Failed to parse JSON from response: {response.content}")
                 if 'artist' in data and 'image' in data['artist']:
                     for image in data['artist']['image']:
                         if image['size'] == 'extralarge' and '#text' in image:
