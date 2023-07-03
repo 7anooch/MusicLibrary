@@ -3,6 +3,7 @@ import musicbrainzngs, discogs_client, requests.exceptions, urllib.parse, unicod
 from urllib.parse import urlencode, urlparse, parse_qs
 from urllib.parse import quote_plus
 from requests.exceptions import ConnectTimeout
+from requests.exceptions import ConnectionError
 from pylast import PyLastError
 from rapidfuzz import fuzz, process
 from functions import *
@@ -152,6 +153,8 @@ def get_lastfm_artist_image(artist_name):
         except requests.exceptions.SSLError:
             print(f"SSL error occurred for artist: {artist_name}")
             time.sleep(1)  # Wait for 1 second before retrying the request
+        except ConnectionError:
+            print("Could not connect to the server. Please check your internet connection and try again.")
     return None
 
 # check?
