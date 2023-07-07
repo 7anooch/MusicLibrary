@@ -352,9 +352,9 @@ def update_saved_spotify_albums(conn):
         # Check if the album already exists in the albums table
         cursor.execute("""
             SELECT * FROM albums 
-            WHERE IGNORE_PARENTHESIS_AND_BRACKETS(album_name, ?)
-            AND artist_name = ?
-        """, (saved_album_name, saved_artist_name))
+            WHERE LOWER(IGNORE_PARENTHESIS_AND_BRACKETS(album_name, ?)) = LOWER(?)
+            AND LOWER(artist_name) = LOWER(?)
+        """, (saved_album_name, saved_album_name, saved_artist_name))
         
         album = cursor.fetchone()
         
@@ -373,6 +373,7 @@ def update_saved_spotify_albums(conn):
             """, (album[ALBUM_ID],))
     
     conn.commit()
+
 
 
 
@@ -1605,8 +1606,8 @@ def first_time_functions(conn):
 # Compares two strings after removing any text within parentheses or brackets.
 def ignore_parentheses_and_brackets(string1, string2):
     pattern = r' ?[\(\[].*?[\)\]]'
-    cleaned_string1 = re.sub(pattern, '', string1)
-    cleaned_string2 = re.sub(pattern, '', string2)
+    cleaned_string1 = re.sub(pattern, '', string1).lower()
+    cleaned_string2 = re.sub(pattern, '', string2).lower()
     return cleaned_string1 == cleaned_string2
 
 # Saves unique genres to a file
@@ -1858,11 +1859,11 @@ def download_latest_csv(url, filename):
         
 def update_database_from_github_csv(conn):
     # Hardcoded URLs of the album and artist data CSV files on GitHub
-    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230703.csv'
+    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230706.csv'
     artistdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/artist_data_20230703.csv'
     
     # Set the names of the local files to be downloaded
-    albumdat = "album_data_20230703.csv"
+    albumdat = "album_data_20230706.csv"
     artistdat = "artist_data_20230703.csv"
 
     # Download the CSV files
