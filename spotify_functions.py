@@ -19,40 +19,50 @@ db_name = config['database']['name']
 
 
 def get_spotify_authorization_code(client_id, redirect_uri, scope):
-	""" Gets Spotify authorization code by opening a web browser for user authentication"""
-	authorize_url = 'https://accounts.spotify.com/authorize'
-	params = {
-		'client_id': client_id,
-		'response_type': 'code',
-		'redirect_uri': redirect_uri,
-		'scope': scope
-	}
-	url = f"{authorize_url}?{urlencode(params)}"
-	webbrowser.open(url)
-	response_url = input("Please paste the redirected URL here: ")
-	query = urlparse(response_url).query
-	response_params = parse_qs(query)
-	code = response_params['code'][0]
-	return code
+    """ Gets Spotify authorization code by opening a web browser for user authentication"""
+    authorize_url = 'https://accounts.spotify.com/authorize'
+    params = {
+        'client_id': client_id,
+        'response_type': 'code',
+        'redirect_uri': redirect_uri,
+        'scope': scope
+    }
+    url = f"{authorize_url}?{urlencode(params)}"
+    webbrowser.open(url)
+    response_url = input("Please paste the redirected URL here: ")
+    query = urlparse(response_url).query
+    response_params = parse_qs(query)
+    code = response_params['code'][0]
+    return code
 
 def get_spotify_access_token(client_id, client_secret, redirect_uri, scope):
-	""" Gets Spotify access token using the authorization code"""
-	code = get_spotify_authorization_code(client_id, redirect_uri, scope)
-	url = 'https://accounts.spotify.com/api/token'
-	auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    """ Gets Spotify access and refresh tokens using the authorization code"""
+    code = get_spotify_authorization_code(client_id, redirect_uri, scope)
+    url = 'https://accounts.spotify.com/api/token'
+    auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
 
-	headers = {
-		'Authorization': f'Basic {auth_header}'
-	}
-	data = {
-		'grant_type': 'authorization_code',
-		'code': code,
-		'redirect_uri': redirect_uri
-	}
-	response = requests.post(url, headers=headers, data=data)
-	token_data = response.json()
-	access_token = token_data['access_token']
-	return access_token
+    headers = {
+        'Authorization': f'Basic {auth_header}'
+    }
+    data = {
+        'grant_type': 'authorization_code',
+        'code': code,
+        'redirect_uri': redirect_uri
+    }
+    try:
+        response = requests.post(url, headers=headers, data=data)
+        response.raise_for_status()  # Raises stored HTTPError, if one occurred
+    except requests.exceptions.HTTPError as err:
+        print(f"HTTP error occurred: {err}")
+        return None
+    except Exception as err:
+        print(f"An error occurred: {err}")
+        return None
+
+    token_data = response.json()
+    access_token = token_data['access_token']
+    refresh_token = token_data['refresh_token']
+    return access_token
 
 # check
 def fetch_spotify_saved_albums(access_token, limit=50, offset=0, retries=3, delay=5):
@@ -363,6 +373,9 @@ def update_spotify_data(conn, spotify_token):
 	artists = cursor.fetchall()
 
 	for artist_id, artist_name, artist_spotify_url in artists:
+		headers = {
+		'Authorization': f'Bearer {spotify_token}'
+		}
 		if artist_name in missing_artists:
 			continue
 		artist_search_url = f'https://api.spotify.com/v1/search?q={urllib.parse.quote(artist_name)}&type=artist&limit=1'
@@ -396,6 +409,9 @@ def update_spotify_data(conn, spotify_token):
 	albums = cursor.fetchall()
 
 	for album_id, artist_name, album_name, album_spotify_url, album_spotify_id in albums:
+		headers = {
+		'Authorization': f'Bearer {spotify_token}'
+		}
 		if album_name in missing_albums:
 			continue
 		if album_spotify_id is not None:
@@ -411,9 +427,11 @@ def update_spotify_data(conn, spotify_token):
 				print(f"Error fetching Spotify data for album {album_name}: Status {album_response.status_code}, {album_response.text}")
 				missing_albums.append(album_name)
 				continue
-			album_data = album_response.json()
 
-			if 'albums' in album_data and album_data['albums']['items']:
+			album_data = album_response.json()
+			if 'id' in album_data:
+				album_info = album_data
+			elif 'albums' in album_data and album_data['albums']['items']:
 				album_info = album_data['albums']['items'][0]
 			elif 'album' in album_data:
 				album_info = album_data['album']

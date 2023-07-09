@@ -937,6 +937,8 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
         cursor.execute("INSERT OR IGNORE INTO executed_functions (function_name, executed) VALUES (?, 0)", (func_name,))
     conn.commit()
 
+    lastfm_retries = 3
+
     def is_spotify_token_valid(access_token):
         headers = {
         'Authorization': f'Bearer {access_token}'
@@ -990,7 +992,18 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done("create_new_albums_table",create_new_albums_table, conn)
     print(lastfm_last_update)
     #execute_if_not_done('get_new_scrobbles', fetch_lastfm_scrobbles, conn, api_key=LASTFM_API_KEY, api_secret=LASTFM_SECRET, username=LASTFM_USER, from_timestamp=lastfm_last_update)
-    new_scrob, lastfm_ts = fetch_lastfm_scrobbles(conn, LASTFM_API_KEY, LASTFM_SECRET, LASTFM_USER, from_timestamp=lastfm_last_update)
+    
+    for i in range(lastfm_retries):
+        result = fetch_lastfm_scrobbles(conn, LASTFM_API_KEY, LASTFM_SECRET, LASTFM_USER, from_timestamp=lastfm_last_update)
+    
+        if result is not None:
+            new_scrob, lastfm_ts = result
+            break
+        else:
+            print(f"Attempt {i+1} at fetching last.fm scrobbles failed. Retrying in a a couple of seconds...")
+            time.sleep(2)
+    else:
+        raise Exception("Maximum retry attempts exceeded. The last.fm API may be having issues, please try again later.")
 
     execute_if_not_done("insert_scrobbles_into_new_playlist",insert_scrobbles_into_new_playlist, conn, new_scrob)
     execute_if_not_done( "populate_new_tracks_table" , populate_new_tracks_table, conn)
@@ -1020,7 +1033,7 @@ def update_databases(conn, lastfm_username, lastfm_api_key):
     execute_if_not_done( "update_release_info" , update_release_info, conn)
     if use_spotify:
         execute_if_not_done( "update spotify album length", update_album_durations, conn)
-    execute_if_not_done( "delete unwanted albums again", delete_unwanted_albums_again, conn)
+    #execute_if_not_done( "delete unwanted albums again", delete_unwanted_albums_again, conn)
     execute_if_not_done( "update_rym_genres" , update_rym_genres, conn, use_scraperapi=USE_SCRAPER)
     execute_if_not_done( "update artist genres" , update_artist_genres, conn)
     execute_if_not_done( "update_albums_with_cover_arts" ,update_albums_with_cover_arts, conn, LASTFM_API_KEY)
@@ -1859,12 +1872,12 @@ def download_latest_csv(url, filename):
         
 def update_database_from_github_csv(conn):
     # Hardcoded URLs of the album and artist data CSV files on GitHub
-    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230706.csv'
-    artistdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/artist_data_20230703.csv'
+    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230708.csv'
+    artistdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/artist_data_20230708.csv'
     
     # Set the names of the local files to be downloaded
-    albumdat = "album_data_20230706.csv"
-    artistdat = "artist_data_20230703.csv"
+    albumdat = "album_data_20230708.csv"
+    artistdat = "artist_data_20230708.csv"
 
     # Download the CSV files
     download_latest_csv(albumdat_url, albumdat)
