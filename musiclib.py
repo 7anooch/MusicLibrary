@@ -63,8 +63,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--update', action='store_true', help='update the database')
     parser.add_argument('--import_csv', action='store_true', help='import data from csv')
+    parser.add_argument('--reset', action='store_true', help='import data from csv')
     args = parser.parse_args()
-    main(args.update, args.import_csv)
+    main(args.update, args.import_csv, args.reset)
     if check_if_table_exists(conn, "albums"):
         if use_spotify:
             table_name = 'saved_albums'
