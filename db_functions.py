@@ -217,7 +217,6 @@ def update_album_artist_ids(conn):
 #     conn.commit()
 
 def update_saved_spotify_albums(conn):
-    conn.create_function("IGNORE_PARENTHESIS_AND_BRACKETS", 2, ignore_parentheses_and_brackets)
     cursor = conn.cursor()
 
     ALBUM_ID = 0
@@ -228,30 +227,18 @@ def update_saved_spotify_albums(conn):
     cursor.execute("SELECT * FROM saved_albums")
     saved_albums = cursor.fetchall()
 
-    # A set to store albums already processed
-    processed_albums = set()
+    # Query all albums
+    cursor.execute("SELECT * FROM albums")
+    existing_albums = cursor.fetchall()
 
     for saved_album in saved_albums:
         saved_album_name = saved_album[ALBUM_NAME]
         saved_artist_name = saved_album[ARTIST_NAME]
-        
-        # Form a unique identifier for the album
-        album_identifier = (saved_album_name.lower(), saved_artist_name.lower())
 
-        # If we've already processed this album, skip it
-        if album_identifier in processed_albums:
-            continue
-        else:
-            processed_albums.add(album_identifier)
-        
         # Check if the album already exists in the albums table
-        cursor.execute("""
-            SELECT * FROM albums 
-            WHERE LOWER(IGNORE_PARENTHESIS_AND_BRACKETS(album_name, ?)) = LOWER(?)
-            AND LOWER(artist_name) = LOWER(?)
-        """, (saved_album_name, saved_album_name, saved_artist_name))
-
-        album = cursor.fetchone()
+        album = next((album for album in existing_albums 
+                      if ignore_parentheses_and_brackets(album[ALBUM_NAME], saved_album_name) 
+                      and album[ARTIST_NAME+1].lower() == saved_artist_name.lower()), None)
 
         if album is None:
             # Album does not exist in the albums table, so insert it
@@ -951,7 +938,7 @@ def remove_duplicates_albums(conn):
 
             # Delete the other duplicate albums from the database
             num_deleted = delete_duplicate_albums(conn, matched_albums, album_to_keep)
-            num_duplicates_removed += 1
+            num_duplicates_removed += num_deleted
 
     conn.commit()
     print(f"Removed {num_duplicates_removed} duplicate albums.")
