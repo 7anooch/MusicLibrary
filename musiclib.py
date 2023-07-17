@@ -8,6 +8,7 @@ from lastfm_functions import *
 from musicbrainz_functions import *
 from spotify_functions import *
 from rym_functions import *
+from db_functions import *
 from rapidfuzz import fuzz, process 
 
 with open('keys.json', 'r') as f:
