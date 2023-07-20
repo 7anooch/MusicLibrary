@@ -1274,12 +1274,12 @@ def download_latest_csv(url, filename):
         
 def update_database_from_github_csv(conn):
     # Hardcoded URLs of the album and artist data CSV files on GitHub
-    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230711.csv'
-    artistdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/artist_data_20230711.csv'
+    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230719.csv'
+    artistdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/artist_data_20230719.csv'
     
     # Set the names of the local files to be downloaded
-    albumdat = "album_data_20230711.csv"
-    artistdat = "artist_data_20230711.csv"
+    albumdat = "album_data_20230719.csv"
+    artistdat = "artist_data_20230719.csv"
 
     # Download the CSV files
     download_latest_csv(albumdat_url, albumdat)
