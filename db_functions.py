@@ -1274,12 +1274,12 @@ def download_latest_csv(url, filename):
         
 def update_database_from_github_csv(conn):
     # Hardcoded URLs of the album and artist data CSV files on GitHub
-    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230719.csv'
-    artistdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/artist_data_20230719.csv'
+    albumdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/album_data_20230909.csv'
+    artistdat_url = 'https://raw.githubusercontent.com/7anooch/MusicLibrary-data/main/artist_data_20230909.csv'
     
     # Set the names of the local files to be downloaded
-    albumdat = "album_data_20230719.csv"
-    artistdat = "artist_data_20230719.csv"
+    albumdat = "album_data_20230909.csv"
+    artistdat = "artist_data_20230909.csv"
 
     # Download the CSV files
     download_latest_csv(albumdat_url, albumdat)
@@ -1320,7 +1320,7 @@ def update_database_from_github_csv(conn):
                 print(f"An error occurred when updating row {idx}: {e}")
 
         conn.commit()
-        print(f"Done importing album data from CSV! {album_counter} albums updated.")
+        print(f"Done importing album data from CSV! {album_counter} albums found.")
     except Exception as e:
         print(f"An error occurred: {e}")
 
@@ -1347,7 +1347,7 @@ def update_database_from_github_csv(conn):
 
         # Commit the changes and close the connection
         conn.commit()
-        print(f"Done importing artist data from CSV! {artist_counter} artists updated.")
+        print(f"Done importing artist data from CSV! {artist_counter} artists found.")
     except Exception as e:
         print(f"An error occurred: {e}")
 
